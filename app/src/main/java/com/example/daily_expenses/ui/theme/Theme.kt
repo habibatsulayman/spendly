@@ -1,65 +1,89 @@
 package com.example.daily_expenses.ui.theme
 
 import android.app.Activity
-import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
 
-private val DarkColorScheme = darkColorScheme(
-    primary = SpendlyPurpleLight,
-    secondary = SpendlyPurple,
-    tertiary = SpendlyPurpleDark,
-    background = SpendlyOnSurface,
-    surface = Color(0xFF1C1B1F),
-    onPrimary = SpendlyWhite,
-    onSecondary = SpendlyWhite,
-    onTertiary = SpendlyWhite,
-    onBackground = SpendlyWhite,
-    onSurface = SpendlyWhite
+@Immutable
+data class SpendlyExtendedColors(
+    val badgeUpBg: Color,
+    val badgeUpText: Color,
+    val badgeDownBg: Color,
+    val badgeDownText: Color,
+    val categories: List<Color>,
+    val isDark: Boolean
 )
 
-private val LightColorScheme = lightColorScheme(
-    primary = SpendlyPurple,
-    secondary = SpendlyPurpleLight,
-    tertiary = SpendlyPurpleDark,
-    background = SpendlyBackground,
-    surface = SpendlySurface,
-    onPrimary = SpendlyWhite,
-    onSecondary = SpendlyWhite,
-    onTertiary = SpendlyWhite,
-    onBackground = SpendlyOnBackground,
-    onSurface = SpendlyOnSurface
-)
+val LocalSpendlyColors = staticCompositionLocalOf {
+    SpendlyExtendedColors(
+        badgeUpBg = LightBadgeUpBg,
+        badgeUpText = LightBadgeUpText,
+        badgeDownBg = LightBadgeDownBg,
+        badgeDownText = LightBadgeDownText,
+        categories = CategoryColorsLight,
+        isDark = false
+    )
+}
 
+object SpendlyThemeExtras {
+    val colors: SpendlyExtendedColors
+        @Composable
+        get() = LocalSpendlyColors.current
+}
 
 @Composable
 fun SpendlyTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = false, // Disabled for consistent branding
     content: @Composable () -> Unit
 ) {
-
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
+    val colorScheme = if (darkTheme) SpendlyDark else SpendlyLight
+    val extendedColors = if (darkTheme) {
+        SpendlyExtendedColors(
+            badgeUpBg = DarkBadgeUpBg,
+            badgeUpText = DarkBadgeUpText,
+            badgeDownBg = DarkBadgeDownBg,
+            badgeDownText = DarkBadgeDownText,
+            categories = CategoryColorsDark,
+            isDark = true
+        )
+    } else {
+        SpendlyExtendedColors(
+            badgeUpBg = LightBadgeUpBg,
+            badgeUpText = LightBadgeUpText,
+            badgeDownBg = LightBadgeDownBg,
+            badgeDownText = LightBadgeDownText,
+            categories = CategoryColorsLight,
+            isDark = false
+        )
     }
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
-        content = content
-    )
+    val view = LocalView.current
+    if (!view.isInEditMode) {
+        SideEffect {
+            val window = (view.context as Activity).window
+            window.statusBarColor = colorScheme.background.toArgb()
+            window.navigationBarColor = colorScheme.surface.toArgb()
+            val controller = WindowCompat.getInsetsController(window, view)
+            controller.isAppearanceLightStatusBars = !darkTheme
+            controller.isAppearanceLightNavigationBars = !darkTheme
+        }
+    }
+
+    androidx.compose.runtime.CompositionLocalProvider(
+        LocalSpendlyColors provides extendedColors
+    ) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = Typography,
+            content = content
+        )
+    }
 }
