@@ -23,7 +23,106 @@ data class MonthlyBudgetPlan(
         get() = needsBudget + wantsBudget + investmentBudget
 
     val hasBudget: Boolean
-        get() = totalAllocated > 0.0
+        get() = totalAllocated > 0.0 || income > 0.0
+
+    fun withLoggedIncome(loggedIncome: Double): MonthlyBudgetPlan {
+        return if (loggedIncome > 0.0) {
+            MonthlyBudgetPlan(
+                income = loggedIncome,
+                needsBudget = loggedIncome * (needsRatio / 100.0),
+                investmentBudget = loggedIncome * (investmentRatio / 100.0),
+                wantsBudget = loggedIncome * (wantsRatio / 100.0),
+                needsRatio = needsRatio,
+                investmentRatio = investmentRatio,
+                wantsRatio = wantsRatio,
+                investmentSorted = investmentSorted
+            )
+        } else {
+            this
+        }
+    }
+}
+
+fun greetingForHour(hourOfDay: Int, userName: String = "Habeebah"): String {
+    return when (hourOfDay) {
+        in 5..11 -> "Good morning, $userName"
+        in 12..16 -> "Good afternoon, $userName"
+        in 17..20 -> "Good evening, $userName"
+        else -> "Good night, $userName"
+    }
+}
+
+data class SelectedDay(
+    val year: Int,
+    val month: Int, // 0..11
+    val dayOfMonth: Int
+) {
+    fun toCalendar(): Calendar = Calendar.getInstance().apply {
+        set(year, month, dayOfMonth, 12, 0, 0)
+        set(Calendar.MILLISECOND, 0)
+    }
+
+    val isToday: Boolean
+        get() {
+            val now = Calendar.getInstance()
+            return now.get(Calendar.YEAR) == year &&
+                now.get(Calendar.MONTH) == month &&
+                now.get(Calendar.DAY_OF_MONTH) == dayOfMonth
+        }
+
+    val isYesterday: Boolean
+        get() {
+            val yest = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -1) }
+            return yest.get(Calendar.YEAR) == year &&
+                yest.get(Calendar.MONTH) == month &&
+                yest.get(Calendar.DAY_OF_MONTH) == dayOfMonth
+        }
+
+    val topBarLabel: String
+        get() = SimpleDateFormat("EEE, d MMM", Locale.getDefault()).format(toCalendar().time)
+
+    val sectionLabel: String
+        get() = when {
+            isToday -> "Today"
+            isYesterday -> "Yesterday"
+            else -> SimpleDateFormat("EEE, d MMM", Locale.getDefault()).format(toCalendar().time)
+        }
+
+    val cardHeaderLabel: String
+        get() = when {
+            isToday -> "Spent today"
+            isYesterday -> "Spent yesterday"
+            else -> "Spent on ${SimpleDateFormat("d MMM", Locale.getDefault()).format(toCalendar().time)}"
+        }
+
+    fun previousDay(): SelectedDay {
+        val cal = toCalendar().apply { add(Calendar.DAY_OF_YEAR, -1) }
+        return SelectedDay(
+            cal.get(Calendar.YEAR),
+            cal.get(Calendar.MONTH),
+            cal.get(Calendar.DAY_OF_MONTH)
+        )
+    }
+
+    fun nextDay(): SelectedDay {
+        val cal = toCalendar().apply { add(Calendar.DAY_OF_YEAR, 1) }
+        return SelectedDay(
+            cal.get(Calendar.YEAR),
+            cal.get(Calendar.MONTH),
+            cal.get(Calendar.DAY_OF_MONTH)
+        )
+    }
+
+    companion object {
+        fun today(): SelectedDay {
+            val now = Calendar.getInstance()
+            return SelectedDay(
+                now.get(Calendar.YEAR),
+                now.get(Calendar.MONTH),
+                now.get(Calendar.DAY_OF_MONTH)
+            )
+        }
+    }
 }
 
 data class MonthYear(
@@ -59,6 +158,71 @@ data class MonthYear(
     }
 }
 
+data class IslamicQuote(
+    val text: String,
+    val reference: String
+)
+
+object IslamicQuotesProvider {
+    val quotes = listOf(
+        IslamicQuote(
+            "“And whoever puts their trust in Allah, then He will suffice him.”",
+            "Qur'an 65:3"
+        ),
+        IslamicQuote(
+            "“If you are grateful, I will surely increase you [in favor].”",
+            "Qur'an 14:7"
+        ),
+        IslamicQuote(
+            "“Charity does not decrease wealth.”",
+            "Prophet Muhammad ﷺ · Sahih Muslim"
+        ),
+        IslamicQuote(
+            "“Verily, with hardship comes ease.”",
+            "Qur'an 94:6"
+        ),
+        IslamicQuote(
+            "“Richness is not having many possessions, but richness is the contentment of the soul.”",
+            "Prophet Muhammad ﷺ · Sahih al-Bukhari"
+        ),
+        IslamicQuote(
+            "“And there is no creature on earth but that upon Allah is its provision.”",
+            "Qur'an 11:6"
+        ),
+        IslamicQuote(
+            "“Allah does not burden a soul beyond that it can bear.”",
+            "Qur'an 2:286"
+        ),
+        IslamicQuote(
+            "“Unquestionably, by the remembrance of Allah hearts are assured.”",
+            "Qur'an 13:28"
+        ),
+        IslamicQuote(
+            "“And spend in the way of Allah and do not throw yourselves into destruction, and do good; indeed, Allah loves the doers of good.”",
+            "Qur'an 2:195"
+        ),
+        IslamicQuote(
+            "“And those who, when they spend, are neither extravagant nor niggardly, but hold a medium way between those.”",
+            "Qur'an 25:67"
+        ),
+        IslamicQuote(
+            "“Indeed, my Lord expands provision for whom He wills and restricts it.”",
+            "Qur'an 34:39"
+        ),
+        IslamicQuote(
+            "“Whoever is pleased that his provision be expanded and his life span extended, let him keep ties of kinship.”",
+            "Prophet Muhammad ﷺ · Sahih al-Bukhari"
+        )
+    )
+
+    private const val THREE_HOURS_MS = 3 * 60 * 60 * 1000L
+
+    fun getQuoteForTime(timeMillis: Long, manualOffset: Int = 0): IslamicQuote {
+        val slot = ((timeMillis / THREE_HOURS_MS).toInt() + manualOffset).coerceAtLeast(0)
+        return quotes[slot % quotes.size]
+    }
+}
+
 class HomeViewModel(
     private val repository: ExpenseRepository,
     private val context: Context
@@ -66,16 +230,50 @@ class HomeViewModel(
 
     private val prefs = context.getSharedPreferences("spendly_prefs", Context.MODE_PRIVATE)
 
-    // ─── Today's expenses (daily expenses + Wants/Needs sorted today) ───────
-    val todayExpenses: StateFlow<List<Expense>> = repository.getExpensesForToday()
-        .map { list -> list.filter { it.bucket == "Expense" || it.isSorted } }
+    // ─── Selected Day for Home Screen (defaults to Today) ───────────────────
+    private val _selectedDay = MutableStateFlow(SelectedDay.today())
+    val selectedDay: StateFlow<SelectedDay> = _selectedDay
+
+    fun selectDay(day: SelectedDay) {
+        _selectedDay.value = day
+    }
+
+    fun selectPreviousDay() {
+        _selectedDay.value = _selectedDay.value.previousDay()
+    }
+
+    fun selectNextDay() {
+        if (!_selectedDay.value.isToday) {
+            _selectedDay.value = _selectedDay.value.nextDay()
+        }
+    }
+
+    fun resetToTodayIfNewDay() {
+        val currentToday = SelectedDay.today()
+        if (_lastKnownToday != currentToday) {
+            _lastKnownToday = currentToday
+            _selectedDay.value = currentToday
+            _selectedMonth.value = MonthYear(currentToday.year, currentToday.month)
+            refreshBudgetPlan()
+        }
+    }
+
+    private var _lastKnownToday = SelectedDay.today()
+
+    // ─── Expenses for Selected Day (daily expenses + Wants/Needs sorted that day) ──
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    val todayExpenses: StateFlow<List<Expense>> = _selectedDay
+        .flatMapLatest { day ->
+            repository.getExpensesForDate(day.year, day.month, day.dayOfMonth)
+                .map { list -> list.filter { it.bucket == "Expense" || (it.isSorted && it.bucket != "Income") } }
+        }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val totalSpentToday: StateFlow<Double> = todayExpenses
         .map { list -> list.sumOf { it.amount } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
 
-    // ─── Daily budget (defaults to 5,000 like screenshot) ───────────────────
+    // ─── Daily budget (defaults to 5,000) ───────────────────────────────────
     private val _dailyBudget = MutableStateFlow(prefs.getFloat("daily_budget", 5000f).toDouble())
     val dailyBudget: StateFlow<Double> = _dailyBudget
 
@@ -101,9 +299,60 @@ class HomeViewModel(
         refreshBudgetPlan()
     }
 
+    // ─── Monthly Items & Incomes for Selected Month ─────────────────────────
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    val selectedMonthItems: StateFlow<List<Expense>> = _selectedMonth
+        .flatMapLatest { m ->
+            repository.getExpensesForMonth(m.year, m.month)
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val incomeItems: StateFlow<List<Expense>> = selectedMonthItems
+        .map { list -> list.filter { it.bucket == "Income" }.sortedByDescending { it.date } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val totalLoggedIncome: StateFlow<Double> = incomeItems
+        .map { list -> list.sumOf { it.amount } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+
+    val needsItems: StateFlow<List<Expense>> = selectedMonthItems
+        .map { list -> list.filter { it.bucket == "Needs" }.sortedBy { it.id } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val wantsItems: StateFlow<List<Expense>> = selectedMonthItems
+        .map { list -> list.filter { it.bucket == "Wants" }.sortedBy { it.id } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // Daily expenses ("Expense") mapped to Needs (Food, Transport, Data) or Wants (Other)
+    val dailyNeedsSpent: StateFlow<Double> = selectedMonthItems
+        .map { list ->
+            list.filter {
+                it.bucket == "Expense" &&
+                    (it.category == "Food" || it.category == "Transport" || it.category == "Data")
+            }.sumOf { it.amount }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+
+    val dailyWantsSpent: StateFlow<Double> = selectedMonthItems
+        .map { list ->
+            list.filter {
+                it.bucket == "Expense" &&
+                    it.category != "Food" && it.category != "Transport" && it.category != "Data"
+            }.sumOf { it.amount }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+
     // ─── Monthly 50:30:20 Budget Plan for Selected Month ────────────────────
-    private val _budgetPlan = MutableStateFlow(loadBudgetPlanFor(_selectedMonth.value))
-    val budgetPlan: StateFlow<MonthlyBudgetPlan> = _budgetPlan
+    private val _storedBudgetPlan = MutableStateFlow(loadBudgetPlanFor(_selectedMonth.value))
+
+    // Combine stored plan with dynamically logged income entries so adding an income stream
+    // automatically updates total income and recalculates Needs / Investment / Wants budgets!
+    val budgetPlan: StateFlow<MonthlyBudgetPlan> = combine(
+        _storedBudgetPlan,
+        totalLoggedIncome
+    ) { stored, loggedIncome ->
+        stored.withLoggedIncome(loggedIncome)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), _storedBudgetPlan.value)
 
     private fun keyPrefix(m: MonthYear) = "budget_${m.year}_${m.month}_"
 
@@ -121,8 +370,6 @@ class HomeViewModel(
         var wants = prefs.getFloat("${p}wants", 0f).toDouble()
         var invest = prefs.getFloat("${p}invest", 0f).toDouble()
 
-        // If a budget was saved before the 50:30:20 (Needs:Investment:Wants) ratio update,
-        // automatically align the amounts with the active ratios when income is present.
         if (income > 0 && !prefs.contains("${p}ratio_invest")) {
             needs = income * (needsRatio / 100.0)
             invest = income * (investRatio / 100.0)
@@ -151,7 +398,7 @@ class HomeViewModel(
     }
 
     private fun refreshBudgetPlan() {
-        _budgetPlan.value = loadBudgetPlanFor(_selectedMonth.value)
+        _storedBudgetPlan.value = loadBudgetPlanFor(_selectedMonth.value)
     }
 
     fun saveBudgetPlanForSelectedMonth(
@@ -165,7 +412,7 @@ class HomeViewModel(
     ) {
         val m = _selectedMonth.value
         val p = keyPrefix(m)
-        val currentSorted = _budgetPlan.value.investmentSorted
+        val currentSorted = _storedBudgetPlan.value.investmentSorted
         prefs.edit()
             .putFloat("${p}income", income.toFloat())
             .putFloat("${p}needs", needs.toFloat())
@@ -178,7 +425,7 @@ class HomeViewModel(
             .putInt("default_ratio_invest", investmentRatio)
             .putInt("default_ratio_wants", wantsRatio)
             .apply()
-        _budgetPlan.value = MonthlyBudgetPlan(
+        _storedBudgetPlan.value = MonthlyBudgetPlan(
             income = income,
             needsBudget = needs,
             wantsBudget = wants,
@@ -193,49 +440,14 @@ class HomeViewModel(
     fun toggleInvestmentSorted() {
         val m = _selectedMonth.value
         val p = keyPrefix(m)
-        val next = !_budgetPlan.value.investmentSorted
+        val next = !_storedBudgetPlan.value.investmentSorted
         prefs.edit().putBoolean("${p}invest_sorted", next).apply()
-        _budgetPlan.value = _budgetPlan.value.copy(investmentSorted = next)
+        _storedBudgetPlan.value = _storedBudgetPlan.value.copy(investmentSorted = next)
     }
 
     fun getPreviousMonthPlan(): MonthlyBudgetPlan {
         return loadBudgetPlanFor(_selectedMonth.value.previous())
     }
-
-    // ─── Wants & Needs items for Selected Month ─────────────────────────────
-    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
-    val selectedMonthItems: StateFlow<List<Expense>> = _selectedMonth
-        .flatMapLatest { m ->
-            repository.getExpensesForMonth(m.year, m.month)
-        }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    val needsItems: StateFlow<List<Expense>> = selectedMonthItems
-        .map { list -> list.filter { it.bucket == "Needs" }.sortedBy { it.id } }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    val wantsItems: StateFlow<List<Expense>> = selectedMonthItems
-        .map { list -> list.filter { it.bucket == "Wants" }.sortedBy { it.id } }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    // Daily expenses ("Expense") mapped to Needs (Food, Transport, Data) or Wants (Other)
-    val dailyNeedsSpent: StateFlow<Double> = selectedMonthItems
-        .map { list ->
-            list.filter {
-                it.bucket == "Expense" &&
-                    (it.category == "Food" || it.category == "Transport" || it.category == "Data")
-            }.sumOf { it.amount }
-        }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
-
-    val dailyWantsSpent: StateFlow<Double> = selectedMonthItems
-        .map { list ->
-            list.filter {
-                it.bucket == "Expense" &&
-                    it.category != "Food" && it.category != "Transport" && it.category != "Data"
-            }.sumOf { it.amount }
-        }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     val previousMonthUnsortedItems: StateFlow<List<Expense>> = _selectedMonth
@@ -272,14 +484,51 @@ class HomeViewModel(
     fun setEditingExpense(expense: Expense?) { _editingExpense.value = expense }
 
     // ─── CRUD ────────────────────────────────────────────────────────────────
-    fun addDailyExpense(amount: Double, category: String, description: String) {
+    fun addDailyExpense(
+        amount: Double,
+        category: String,
+        description: String,
+        timestamp: Long? = null
+    ) {
         viewModelScope.launch {
+            val dateToUse = timestamp ?: run {
+                val day = _selectedDay.value
+                if (day.isToday) System.currentTimeMillis() else day.toCalendar().timeInMillis
+            }
             repository.addExpense(
                 Expense(
                     amount = amount,
                     category = category,
                     description = description,
+                    date = dateToUse,
                     bucket = "Expense",
+                    isSorted = true
+                )
+            )
+        }
+    }
+
+    fun addIncome(
+        amount: Double,
+        source: String,
+        note: String,
+        timestamp: Long? = null
+    ) {
+        viewModelScope.launch {
+            val m = _selectedMonth.value
+            val nowCal = Calendar.getInstance()
+            val dateToUse = timestamp ?: if (nowCal.get(Calendar.YEAR) == m.year && nowCal.get(Calendar.MONTH) == m.month) {
+                System.currentTimeMillis()
+            } else {
+                Calendar.getInstance().apply { set(m.year, m.month, 1, 12, 0, 0) }.timeInMillis
+            }
+            repository.addExpense(
+                Expense(
+                    amount = amount,
+                    category = source,      // e.g. "Salary", "Gift / Dash", "Side Gig", "Other"
+                    description = note,
+                    date = dateToUse,
+                    bucket = "Income",
                     isSorted = true
                 )
             )

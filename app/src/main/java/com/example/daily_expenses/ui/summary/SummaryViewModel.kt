@@ -62,11 +62,12 @@ class SummaryViewModel(private val repository: ExpenseRepository) : ViewModel() 
             MonthlySummary(0.0, 0, emptyList())
         )
 
-    private fun isActualSpend(expense: Expense): Boolean {
+    internal fun isActualSpend(expense: Expense): Boolean {
+        if (expense.bucket == "Income") return false
         return expense.bucket == "Expense" || expense.isSorted
     }
 
-    private fun mapToStandardCategory(expense: Expense): String {
+    internal fun mapToStandardCategory(expense: Expense): String {
         val text = "${expense.category} ${expense.description}".lowercase()
         return when {
             expense.category.equals("Food", ignoreCase = true) ||
@@ -86,9 +87,10 @@ class SummaryViewModel(private val repository: ExpenseRepository) : ViewModel() 
         }
     }
 
-    private fun buildSummary(expenses: List<Expense>): MonthlySummary {
+    internal fun buildSummary(expenses: List<Expense>): MonthlySummary {
+        val nonIncomeExpenses = expenses.filter { it.bucket != "Income" }
         // Include daily expenses + sorted Wants & Needs items; if nothing is sorted yet, fall back to all items in the month so the chart and total reflect what was entered
-        val countedExpenses = expenses.filter { isActualSpend(it) }.ifEmpty { expenses }
+        val countedExpenses = nonIncomeExpenses.filter { isActualSpend(it) }.ifEmpty { nonIncomeExpenses }
         val total = countedExpenses.sumOf { it.amount }
 
         val grouped = countedExpenses.groupBy { mapToStandardCategory(it) }
@@ -138,7 +140,8 @@ class SummaryViewModel(private val repository: ExpenseRepository) : ViewModel() 
                 val month = parts[1].toInt()
                 if (year == selected.year && month == selected.month) return@mapNotNull null
 
-                val counted = list.filter { isActualSpend(it) }.ifEmpty { list }
+                val nonIncome = list.filter { it.bucket != "Income" }
+                val counted = nonIncome.filter { isActualSpend(it) }.ifEmpty { nonIncome }
                 val sum = counted.sumOf { it.amount }
                 if (sum <= 0.0) return@mapNotNull null
 

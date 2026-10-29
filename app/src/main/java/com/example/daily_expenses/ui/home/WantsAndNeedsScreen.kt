@@ -9,15 +9,18 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Checklist
+import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -35,13 +38,17 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.daily_expenses.data.local.Expense
 import com.example.daily_expenses.ui.theme.SpendlyThemeExtras
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlin.math.abs
 
 @Composable
 fun WantsAndNeedsScreen(
     viewModel: HomeViewModel,
     onAddNeed: () -> Unit,
-    onAddWant: () -> Unit
+    onAddWant: () -> Unit,
+    onOpenBudgetAndIncome: () -> Unit = {}
 ) {
     val selectedMonth by viewModel.selectedMonth.collectAsState()
     val budgetPlan by viewModel.budgetPlan.collectAsState()
@@ -51,16 +58,18 @@ fun WantsAndNeedsScreen(
     val dailyWantsSpent by viewModel.dailyWantsSpent.collectAsState()
     val prevUnsorted by viewModel.previousMonthUnsortedItems.collectAsState()
 
-    var showEditBudgetScreen by remember { mutableStateOf(false) }
-
-    val isEmptyState = !budgetPlan.hasBudget && needsItems.isEmpty() && wantsItems.isEmpty() && dailyNeedsSpent == 0.0 && dailyWantsSpent == 0.0
+    val isEmptyState = !budgetPlan.hasBudget &&
+        needsItems.isEmpty() &&
+        wantsItems.isEmpty() &&
+        dailyNeedsSpent == 0.0 &&
+        dailyWantsSpent == 0.0
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        // ── Top Bar: "Wants & Needs" + "Edit budget" / "Set budget" button ──
+        // ── Top Bar: "Wants & Needs" ────────────────────────────────────────
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -74,23 +83,6 @@ fun WantsAndNeedsScreen(
                 style = MaterialTheme.typography.headlineLarge,
                 color = MaterialTheme.colorScheme.onBackground
             )
-
-            Surface(
-                onClick = { showEditBudgetScreen = true },
-                shape = if (budgetPlan.hasBudget) RoundedCornerShape(14.dp) else RoundedCornerShape(6.dp),
-                color = MaterialTheme.colorScheme.background,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.onBackground)
-            ) {
-                Text(
-                    text = if (budgetPlan.hasBudget) "Edit budget" else "Set budget",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    modifier = Modifier.padding(
-                        horizontal = if (budgetPlan.hasBudget) 16.dp else 12.dp,
-                        vertical = if (budgetPlan.hasBudget) 10.dp else 6.dp
-                    )
-                )
-            }
         }
 
         // ── Month Selector: < October 2026 > ────────────────────────────────
@@ -217,7 +209,6 @@ fun WantsAndNeedsScreen(
                         if (prevUnsorted.isNotEmpty()) {
                             viewModel.carryOverUnsortedFromPreviousMonth()
                         } else {
-                            // If no previous items exist, open budget setup or add need
                             onAddNeed()
                         }
                     }
@@ -267,25 +258,11 @@ fun WantsAndNeedsScreen(
                         ratio = budgetPlan.investmentRatio,
                         isSorted = budgetPlan.investmentSorted,
                         onToggle = { viewModel.toggleInvestmentSorted() },
-                        onEditBudget = { showEditBudgetScreen = true }
+                        onEditBudget = onOpenBudgetAndIncome
                     )
                 }
             }
         }
-    }
-
-    if (showEditBudgetScreen) {
-        MonthlyBudgetScreenDialog(
-            monthName = selectedMonth.shortMonthName,
-            prevMonthName = selectedMonth.previous().shortMonthName,
-            currentPlan = budgetPlan,
-            previousPlan = viewModel.getPreviousMonthPlan(),
-            onDismiss = { showEditBudgetScreen = false },
-            onSave = { inc, n, w, inv, nRatio, iRatio, wRatio ->
-                viewModel.saveBudgetPlanForSelectedMonth(inc, n, w, inv, nRatio, iRatio, wRatio)
-                showEditBudgetScreen = false
-            }
-        )
     }
 }
 
@@ -378,7 +355,7 @@ private fun BucketChecklistSection(
                                 onClick = { onToggleItem(item) },
                                 onLongClick = { onDeleteItem(item) }
                             )
-                            .padding(horizontal = 18.dp, vertical = 16.dp),
+                            .padding(start = 18.dp, end = 8.dp, top = 14.dp, bottom = 14.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         SpendlyCheckbox(
@@ -414,6 +391,18 @@ private fun BucketChecklistSection(
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
+
+                        IconButton(
+                            onClick = { onDeleteItem(item) },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.DeleteOutline,
+                                contentDescription = "Delete ${item.category}",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                modifier = Modifier.size(19.dp)
+                            )
+                        }
                     }
 
                     HorizontalDivider(
@@ -527,6 +516,9 @@ fun MonthlyBudgetScreenDialog(
     prevMonthName: String,
     currentPlan: MonthlyBudgetPlan,
     previousPlan: MonthlyBudgetPlan,
+    incomeItems: List<Expense> = emptyList(),
+    onAddIncome: () -> Unit = {},
+    onDeleteIncome: (Expense) -> Unit = {},
     onDismiss: () -> Unit,
     onSave: (
         income: Double,
@@ -538,7 +530,7 @@ fun MonthlyBudgetScreenDialog(
         wantsRatio: Int
     ) -> Unit
 ) {
-    var incomeText by remember {
+    var incomeText by remember(currentPlan.income) {
         mutableStateOf(if (currentPlan.income > 0) currentPlan.income.toLong().toString() else "")
     }
     var needsRatioText by remember {
@@ -550,13 +542,13 @@ fun MonthlyBudgetScreenDialog(
     var wantsRatioText by remember {
         mutableStateOf(currentPlan.wantsRatio.toString())
     }
-    var needsText by remember {
+    var needsText by remember(currentPlan.needsBudget) {
         mutableStateOf(if (currentPlan.needsBudget > 0) currentPlan.needsBudget.toLong().toString() else "")
     }
-    var wantsText by remember {
+    var wantsText by remember(currentPlan.wantsBudget) {
         mutableStateOf(if (currentPlan.wantsBudget > 0) currentPlan.wantsBudget.toLong().toString() else "")
     }
-    var investText by remember {
+    var investText by remember(currentPlan.investmentBudget) {
         mutableStateOf(if (currentPlan.investmentBudget > 0) currentPlan.investmentBudget.toLong().toString() else "")
     }
     var showCustomRatioRow by remember {
@@ -599,6 +591,7 @@ fun MonthlyBudgetScreenDialog(
                 .background(MaterialTheme.colorScheme.background)
                 .statusBarsPadding()
                 .navigationBarsPadding()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp, vertical = 16.dp)
         ) {
             // ── Header: < October budget ────────────────────────────────────
@@ -643,7 +636,7 @@ fun MonthlyBudgetScreenDialog(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Monthly income (optional)",
+                            text = if (incomeItems.isNotEmpty()) "Total monthly income (${incomeItems.size} logged)" else "Monthly income (optional)",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -668,47 +661,109 @@ fun MonthlyBudgetScreenDialog(
                     }
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = "₦",
-                            style = MaterialTheme.typography.displaySmall.copy(
-                                fontSize = 34.sp,
-                                fontWeight = FontWeight.Bold
-                            ),
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        BasicTextField(
-                            value = incomeText,
-                            onValueChange = { value ->
-                                val clean = value.filter { it.isDigit() }
-                                incomeText = clean
-                                val inc = clean.toDoubleOrNull() ?: 0.0
-                                recalculateFromIncomeAndRatios(inc, nRatio, iRatio, wRatio)
-                            },
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            textStyle = MaterialTheme.typography.displaySmall.copy(
-                                fontSize = 34.sp,
-                                fontWeight = FontWeight.Bold,
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                text = "₦",
+                                style = MaterialTheme.typography.displaySmall.copy(
+                                    fontSize = 34.sp,
+                                    fontWeight = FontWeight.Bold
+                                ),
                                 color = MaterialTheme.colorScheme.onSurface
-                            ),
-                            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                            decorationBox = { innerTextField ->
-                                Box {
-                                    if (incomeText.isEmpty()) {
-                                        Text(
-                                            text = "0",
-                                            style = MaterialTheme.typography.displaySmall.copy(
-                                                fontSize = 34.sp,
-                                                fontWeight = FontWeight.Bold
-                                            ),
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-                                        )
+                            )
+                            BasicTextField(
+                                value = incomeText,
+                                onValueChange = { value ->
+                                    val clean = value.filter { it.isDigit() }
+                                    incomeText = clean
+                                    val inc = clean.toDoubleOrNull() ?: 0.0
+                                    recalculateFromIncomeAndRatios(inc, nRatio, iRatio, wRatio)
+                                },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                textStyle = MaterialTheme.typography.displaySmall.copy(
+                                    fontSize = 34.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                ),
+                                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                                decorationBox = { innerTextField ->
+                                    Box {
+                                        if (incomeText.isEmpty()) {
+                                            Text(
+                                                text = "0",
+                                                style = MaterialTheme.typography.displaySmall.copy(
+                                                    fontSize = 34.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                ),
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                                            )
+                                        }
+                                        innerTextField()
                                     }
-                                    innerTextField()
+                                }
+                            )
+                        }
+
+                        Surface(
+                            onClick = onAddIncome,
+                            shape = RoundedCornerShape(999.dp),
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                        ) {
+                            Text(
+                                text = "+ Add income",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                            )
+                        }
+                    }
+
+                    if (incomeItems.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        incomeItems.forEach { item ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = if (item.description.isNotBlank()) "${item.category} · ${item.description}" else item.category,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Text(
+                                    text = "+₦${formatAmount(item.amount)}",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                IconButton(
+                                    onClick = { onDeleteIncome(item) },
+                                    modifier = Modifier.size(28.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.DeleteOutline,
+                                        contentDescription = "Delete income",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(16.dp)
+                                    )
                                 }
                             }
-                        )
+                        }
                     }
 
                     if (showCustomRatioRow) {
@@ -897,7 +952,7 @@ fun MonthlyBudgetScreenDialog(
                     }
             )
 
-            Spacer(modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.height(28.dp))
 
             // ── Save budget button ──────────────────────────────────────────
             Button(

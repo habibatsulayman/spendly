@@ -1,21 +1,27 @@
 package com.example.daily_expenses.ui.home
 
+import android.app.DatePickerDialog
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Backspace
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.outlined.CalendarToday
+import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -24,16 +30,38 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.daily_expenses.data.local.Expense
 import com.example.daily_expenses.data.model.CategoryHelper
+import java.util.*
 
 @Composable
 fun AddExpenseSheet(
     editingExpense: Expense?,
-    initialBucket: String = "Expense", // "Expense", "Needs", or "Wants"
+    initialBucket: String = "Expense", // "Expense", "Income", "Needs", or "Wants"
+    initialDay: SelectedDay = SelectedDay.today(),
     onDismiss: () -> Unit,
-    onSave: (amount: Double, category: String, description: String, bucket: String) -> Unit
+    onDelete: ((Expense) -> Unit)? = null,
+    onSave: (amount: Double, category: String, description: String, bucket: String, dateMillis: Long) -> Unit
 ) {
-    val activeBucket = editingExpense?.bucket ?: initialBucket
+    var activeBucket by remember(editingExpense, initialBucket) {
+        mutableStateOf(editingExpense?.bucket ?: initialBucket)
+    }
     val isPlannedItem = activeBucket == "Needs" || activeBucket == "Wants"
+    val isIncome = activeBucket == "Income"
+
+    val context = LocalContext.current
+    var chosenDay by remember(editingExpense, initialDay) {
+        mutableStateOf(
+            if (editingExpense != null) {
+                val cal = Calendar.getInstance().apply { timeInMillis = editingExpense.date }
+                SelectedDay(
+                    cal.get(Calendar.YEAR),
+                    cal.get(Calendar.MONTH),
+                    cal.get(Calendar.DAY_OF_MONTH)
+                )
+            } else {
+                initialDay
+            }
+        )
+    }
 
     var rawAmount by remember(editingExpense) {
         mutableStateOf(
@@ -45,9 +73,17 @@ fun AddExpenseSheet(
 
     var selectedCategory by remember(editingExpense) {
         mutableStateOf(
-            if (editingExpense != null && !isPlannedItem && CategoryHelper.predefinedCategories.contains(editingExpense.category))
+            if (editingExpense != null && activeBucket == "Expense" && CategoryHelper.predefinedCategories.contains(editingExpense.category))
                 editingExpense.category
             else "Food"
+        )
+    }
+
+    var selectedIncomeSource by remember(editingExpense) {
+        mutableStateOf(
+            if (editingExpense != null && activeBucket == "Income" && CategoryHelper.incomeSources.contains(editingExpense.category))
+                editingExpense.category
+            else "Salary"
         )
     }
 
@@ -57,6 +93,20 @@ fun AddExpenseSheet(
 
     var noteText by remember(editingExpense) {
         mutableStateOf(editingExpense?.description ?: "")
+    }
+
+    fun openDatePicker() {
+        DatePickerDialog(
+            context,
+            { _, year, month, dayOfMonth ->
+                chosenDay = SelectedDay(year, month, dayOfMonth)
+            },
+            chosenDay.year,
+            chosenDay.month,
+            chosenDay.dayOfMonth
+        ).apply {
+            datePicker.maxDate = System.currentTimeMillis()
+        }.show()
     }
 
     Dialog(
@@ -72,14 +122,14 @@ fun AddExpenseSheet(
                 .background(MaterialTheme.colorScheme.background)
                 .statusBarsPadding()
                 .navigationBarsPadding()
-                .padding(horizontal = 20.dp, vertical = 16.dp),
+                .padding(horizontal = 20.dp, vertical = 14.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // ── Top Bar: Close 'X' on left, Centered title ───────────────────
+            // ── Top Bar: Close 'X' on left, Centered title, Delete on right ─
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 8.dp)
+                    .padding(vertical = 6.dp)
             ) {
                 IconButton(
                     onClick = onDismiss,
@@ -99,6 +149,7 @@ fun AddExpenseSheet(
                     editingExpense != null -> "Edit ${activeBucket.lowercase()}"
                     activeBucket == "Needs" -> "Add a need"
                     activeBucket == "Wants" -> "Add a want"
+                    activeBucket == "Income" -> "Add income"
                     else -> "Add expense"
                 }
 
@@ -108,91 +159,181 @@ fun AddExpenseSheet(
                     color = MaterialTheme.colorScheme.onBackground,
                     modifier = Modifier.align(Alignment.Center)
                 )
+
+                if (editingExpense != null && onDelete != null) {
+                    IconButton(
+                        onClick = {
+                            onDelete(editingExpense)
+                            onDismiss()
+                        },
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .size(36.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.DeleteOutline,
+                            contentDescription = "Delete",
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            // ── Date Selector (for Daily Expense or Income) ─────────────────
+            if (!isPlannedItem) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Date selector pill (so user can log an expense for any day they forgot!)
+                    Surface(
+                        onClick = { openDatePicker() },
+                        shape = RoundedCornerShape(100.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.CalendarToday,
+                                contentDescription = "Select date",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(13.dp)
+                            )
+                            Text(
+                                text = if (chosenDay.isToday) "Today (${chosenDay.topBarLabel})"
+                                       else if (chosenDay.isYesterday) "Yesterday (${chosenDay.topBarLabel})"
+                                       else chosenDay.topBarLabel,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(18.dp))
 
             // ── Formatted Amount Display ────────────────────────────────────
             val displayNumber = formatInputAmount(rawAmount)
             Text(
                 text = "₦$displayNumber",
                 style = MaterialTheme.typography.displayLarge.copy(
-                    fontSize = 48.sp,
+                    fontSize = 46.sp,
                     fontWeight = FontWeight.Bold
                 ),
                 color = MaterialTheme.colorScheme.onBackground,
                 textAlign = TextAlign.Center
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
-            // ── Category Pills (for Daily Expense) OR Item Title (for Needs/Wants) ──
-            if (!isPlannedItem) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally)
-                ) {
-                    CategoryHelper.predefinedCategories.forEach { cat ->
-                        val chosen = selectedCategory == cat
-                        Surface(
-                            onClick = { selectedCategory = cat },
-                            shape = RoundedCornerShape(100.dp),
-                            color = if (chosen) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.background,
-                            border = BorderStroke(
-                                1.dp,
-                                if (chosen) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                            )
-                        ) {
+            // ── Category Pills (for Daily Expense), Source Pills (for Income), OR Item Title (for Needs/Wants) ──
+            when {
+                activeBucket == "Expense" -> {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally)
+                    ) {
+                        CategoryHelper.predefinedCategories.forEach { cat ->
+                            val chosen = selectedCategory == cat
+                            Surface(
+                                onClick = { selectedCategory = cat },
+                                shape = RoundedCornerShape(100.dp),
+                                color = if (chosen) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.background,
+                                border = BorderStroke(
+                                    1.dp,
+                                    if (chosen) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                )
+                            ) {
+                                Text(
+                                    text = cat,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = if (chosen) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground,
+                                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+                isIncome -> {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)
+                    ) {
+                        CategoryHelper.incomeSources.forEach { src ->
+                            val chosen = selectedIncomeSource == src
+                            Surface(
+                                onClick = { selectedIncomeSource = src },
+                                shape = RoundedCornerShape(100.dp),
+                                color = if (chosen) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.background,
+                                border = BorderStroke(
+                                    1.dp,
+                                    if (chosen) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                )
+                            ) {
+                                Text(
+                                    text = src,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = if (chosen) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground,
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+                else -> {
+                    // Item Title Card for Needs/Wants
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+                    ) {
+                        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
                             Text(
-                                text = cat,
-                                style = MaterialTheme.typography.titleSmall,
-                                color = if (chosen) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground,
-                                modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)
+                                text = if (activeBucket == "Needs") "Need item" else "Want item",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            BasicTextField(
+                                value = itemTitle,
+                                onValueChange = { itemTitle = it },
+                                singleLine = true,
+                                textStyle = MaterialTheme.typography.bodyLarge.copy(
+                                    color = MaterialTheme.colorScheme.onSurface
+                                ),
+                                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                                decorationBox = { innerTextField ->
+                                    Box(modifier = Modifier.fillMaxWidth()) {
+                                        if (itemTitle.isEmpty()) {
+                                            Text(
+                                                text = if (activeBucket == "Needs") "e.g. Rent top-up, Groceries" else "e.g. New sneakers, Hair appointment",
+                                                style = MaterialTheme.typography.bodyLarge,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                            )
+                                        }
+                                        innerTextField()
+                                    }
+                                }
                             )
                         }
                     }
                 }
-            } else {
-                // Item Title Card for Needs/Wants
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.surface,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
-                ) {
-                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-                        Text(
-                            text = if (activeBucket == "Needs") "Need item" else "Want item",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        BasicTextField(
-                            value = itemTitle,
-                            onValueChange = { itemTitle = it },
-                            singleLine = true,
-                            textStyle = MaterialTheme.typography.bodyLarge.copy(
-                                color = MaterialTheme.colorScheme.onSurface
-                            ),
-                            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                            decorationBox = { innerTextField ->
-                                Box(modifier = Modifier.fillMaxWidth()) {
-                                    if (itemTitle.isEmpty()) {
-                                        Text(
-                                            text = if (activeBucket == "Needs") "e.g. Rent top-up, Groceries" else "e.g. New sneakers, Hair appointment",
-                                            style = MaterialTheme.typography.bodyLarge,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                                        )
-                                    }
-                                    innerTextField()
-                                }
-                            }
-                        )
-                    }
-                }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             // ── Note (optional) Box ─────────────────────────────────────────
             Surface(
@@ -220,7 +361,11 @@ fun AddExpenseSheet(
                             Box(modifier = Modifier.fillMaxWidth()) {
                                 if (noteText.isEmpty()) {
                                     Text(
-                                        text = if (isPlannedItem) "e.g. Market on Saturday" else "Lunch at the canteen",
+                                        text = when {
+                                            isIncome -> "e.g. October salary, From uncle, Freelance project"
+                                            isPlannedItem -> "e.g. Market on Saturday"
+                                            else -> "Lunch at the canteen"
+                                        },
                                         style = MaterialTheme.typography.bodyLarge,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                                     )
@@ -263,12 +408,17 @@ fun AddExpenseSheet(
                 onClick = {
                     val amt = rawAmount.toDoubleOrNull() ?: 0.0
                     if (amt > 0) {
-                        val finalCategory = if (isPlannedItem) {
-                            itemTitle.ifBlank { activeBucket }
-                        } else {
-                            selectedCategory
+                        val finalCategory = when {
+                            isPlannedItem -> itemTitle.ifBlank { activeBucket }
+                            isIncome -> selectedIncomeSource
+                            else -> selectedCategory
                         }
-                        onSave(amt, finalCategory, noteText, activeBucket)
+                        val timestamp = if (chosenDay.isToday) {
+                            System.currentTimeMillis()
+                        } else {
+                            chosenDay.toCalendar().timeInMillis
+                        }
+                        onSave(amt, finalCategory, noteText, activeBucket, timestamp)
                     }
                 },
                 modifier = Modifier
@@ -284,6 +434,7 @@ fun AddExpenseSheet(
                     editingExpense != null -> "Save changes"
                     activeBucket == "Needs" -> "Save need"
                     activeBucket == "Wants" -> "Save want"
+                    activeBucket == "Income" -> "Save income"
                     else -> "Save expense"
                 }
                 Text(
@@ -310,7 +461,7 @@ private fun NumericKeypad(
 
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         rows.forEach { row ->
             Row(
@@ -321,7 +472,7 @@ private fun NumericKeypad(
                 row.forEach { key ->
                     Box(
                         modifier = Modifier
-                            .size(width = 88.dp, height = 56.dp)
+                            .size(width = 88.dp, height = 52.dp)
                             .clip(CircleShape)
                             .clickable {
                                 if (key == "BACK") onBackspace() else onDigit(key)

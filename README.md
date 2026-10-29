@@ -32,10 +32,11 @@ Because I am the only user I had to design for, I could make strong choices: no 
 
 | Feature | What it does |
 | --- | --- |
-| **Daily spending** | Track today's total on the home screen alongside every transaction logged today. |
-| **Quick add keypad** | Log an expense from anywhere using a custom number pad, category chips (`Food`, `Transport`, `Data`, `Other`), and an optional note. |
-| **Monthly budget (50:30:20 or custom ratio)** | Each month, enter an amount for Needs, Investment, and Wants. An optional income field fills the 50 / 30 / 20 split by default—or your own custom ratio—and you can edit any amount. |
-| **Wants & Needs checklist** | A monthly checklist. Add items, tick them off when they are sorted, add a short note to any item, or carry over unsorted items from last month. |
+| **Daily spending & past-day logging** | Track today's total on the home screen, or select any previous date from the calendar to view or log forgotten daily expenses. |
+| **Welcome greeting & Islamic reminders** | Time-of-day greeting (`Good morning/afternoon/evening/night, Habeebah`) paired with soul-lifting Qur'an and Hadith quotes that rotate every 3 hours (or cycle on tap). |
+| **Quick add keypad** | Log an expense or income using a custom number pad, category chips, date selector, and an optional note. |
+| **Budget & Income screen** | Log multiple income streams as they come in (`Salary`, `Gift / Dash`, `Side Gig`, `Other`). Your monthly total and **50:30:20** (or custom ratio) split update automatically. |
+| **Wants & Needs checklist** | A dedicated monthly checklist for Needs, Wants, and Investment. Add items, tick them off when sorted, edit or delete items with one tap, or carry over unsorted items from last month. |
 | **Live budget tracking** | As you tick items off, each category updates in real time to show how much is left of its budget. |
 | **Merged Insights & History** | One screen: this month's total, a category donut chart, 50:30:20 budget progress, and a list of past months with `% vs prev` badges. |
 | **Light & Dark themes** | Warm beige with forest & sage accents in light mode, and deep forest with sage accents in dark mode. |
@@ -51,7 +52,7 @@ By default, Spendly uses the **50:30:20** rule (**Needs : Investment : Wants**),
 - **30% Investment** (or custom %): savings and investing, set aside first
 - **20% Wants** (or custom %): things you would like but could live without
 
-Each month you enter an optional income (which auto-fills the split using your ratio) or enter an amount for each category directly. Example with a monthly income of ₦120,000 on the default 50:30:20 split:
+You can log individual income streams (`Salary`, `Gift / Dash`, `Side Gig`, `Other`) on the **Budget & Income** screen as money comes in—or set a monthly budget directly—and Spendly automatically calculates each bucket. Example with a monthly income of ₦120,000 on the default 50:30:20 split:
 
 | Category | Share | Budget |
 | --- | --- | --- |
@@ -69,13 +70,13 @@ If Rent (₦30,000) and Data (₦4,000) are ticked under Needs, you have sorted 
 
 | Screen | Purpose |
 | --- | --- |
-| **Home** | Today's total, progress bar, today's transactions |
-| **Add expense** | Amount first, number pad, category chips, optional note |
-| **Set monthly budget** | Income (optional) and the three category amounts |
-| **Wants & Needs** | The monthly checklist, with budget left for each section |
+| **Home** | Time-of-day greeting, rotating Islamic quote, date selector (today or any past day), daily progress bar, and transactions |
+| **Budget & Income** | Total monthly income, live 50:30:20 / custom ratio split, `Edit budget`, and all logged income streams (`Salary`, `Gift / Dash`, `Side Gig`, `Other`) |
+| **Wants & Needs** | The monthly checklist for Needs, Wants, and Investment, with remaining budget and one-tap delete |
+| **Add / Edit sheet** | Amount first, date picker, number pad, category or income source chips, optional note |
 | **Insights** | Month total, category donut chart, budget progress, past months |
 
-Navigation has three tabs: **Home**, **Wants & Needs**, and **Insights**.
+Navigation has four tabs: **Home**, **Budget & Income**, **Wants & Needs**, and **Insights**.
 
 ---
 
@@ -134,11 +135,11 @@ Spendly/
 │       │   │   ├── model/        # BudgetBucket (50:30:20), CategoryHelper, MonthlyAggregate
 │       │   │   └── repository/   # ExpenseRepository
 │       │   ├── ui/
-│       │   │   ├── home/         # HomeScreen, WantsAndNeedsScreen, AddExpenseSheet, HomeViewModel
+│       │   │   ├── home/         # HomeScreen, IncomeScreen, WantsAndNeedsScreen, AddExpenseSheet, HomeViewModel
 │       │   │   ├── summary/      # SummaryScreen (Insights), SummaryViewModel
 │       │   │   ├── history/      # HistoryScreen, HistoryViewModel
 │       │   │   └── theme/        # Color.kt, Theme.kt, Type.kt (Quicksand, Poppins, Manrope)
-│       │   ├── MainActivity.kt   # 3-tab Scaffold & NavHost
+│       │   ├── MainActivity.kt   # 4-tab Scaffold & NavHost (Home, Budget & Income, Wants & Needs, Insights)
 │       │   └── SpendlyApp.kt     # Application class
 │       └── res/
 │           ├── font/             # Quicksand, Poppins, and Manrope font resources
@@ -172,9 +173,11 @@ All data stays locally on your device via Room and `SharedPreferences`. There ar
 ## Roadmap
 
 - [x] Daily total and daily budget
-- [x] Add expense with custom number pad and today's activity
+- [x] Select any past date to view or log forgotten daily expenses
+- [x] Time-of-day welcome greeting & 3-hour rotating Islamic quotes
+- [x] Dedicated Budget & Income screen for multiple income streams (`Salary`, `Gift / Dash`, `Side Gig`, `Other`)
 - [x] Monthly 50:30:20 & custom ratio budget screen
-- [x] Wants & Needs checklist with notes
+- [x] Wants & Needs checklist with notes and one-tap delete
 - [x] Budget "left" figures that update as items are ticked
 - [x] Merged Insights and History screen with category donut chart
 - [x] Light & Dark themes (forest and sage)

@@ -30,6 +30,13 @@ object CategoryHelper {
         "Other"
     )
 
+    val incomeSources = listOf(
+        "Salary",
+        "Gift / Dash",
+        "Side Gig",
+        "Other"
+    )
+
     fun getIconForCategory(category: String): ImageVector {
         return when (category) {
             "Food", "Food & Dining" -> Icons.Default.Restaurant

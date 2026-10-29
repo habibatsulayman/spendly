@@ -40,6 +40,19 @@ class ExpenseRepository(private val expenseDao: ExpenseDao) {
         return expenseDao.getTotalSpentInRange(start, end)
     }
 
+    fun getExpensesForDate(year: Int, month: Int, dayOfMonth: Int): Flow<List<Expense>> {
+        val calendar = Calendar.getInstance()
+        calendar.set(year, month, dayOfMonth, 0, 0, 0)
+        calendar.set(Calendar.MILLISECOND, 0)
+        val startOfDay = calendar.timeInMillis
+
+        calendar.set(year, month, dayOfMonth, 23, 59, 59)
+        calendar.set(Calendar.MILLISECOND, 999)
+        val endOfDay = calendar.timeInMillis
+
+        return expenseDao.getExpensesForDay(startOfDay, endOfDay)
+    }
+
     fun getExpensesForToday(): Flow<List<Expense>> {
         val calendar = Calendar.getInstance()
         calendar.set(Calendar.HOUR_OF_DAY, 0)

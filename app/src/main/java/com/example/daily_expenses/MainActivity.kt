@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.Checklist
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.PieChart
@@ -16,6 +17,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -28,6 +30,7 @@ import com.example.daily_expenses.ui.home.AddExpenseSheet
 import com.example.daily_expenses.ui.home.HomeScreen
 import com.example.daily_expenses.ui.home.HomeViewModel
 import com.example.daily_expenses.ui.home.HomeViewModelFactory
+import com.example.daily_expenses.ui.home.IncomeScreen
 import com.example.daily_expenses.ui.home.WantsAndNeedsScreen
 import com.example.daily_expenses.ui.summary.SummaryScreen
 import com.example.daily_expenses.ui.summary.SummaryViewModel
@@ -58,6 +61,7 @@ fun SpendlyApp(repository: com.example.daily_expenses.data.repository.ExpenseRep
     val navController = rememberNavController()
     val navItems = listOf(
         NavItem("home", "Home", Icons.Outlined.Home),
+        NavItem("budget_income", "Budget & Income", Icons.Outlined.AccountBalanceWallet),
         NavItem("wants_needs", "Wants & Needs", Icons.Outlined.Checklist),
         NavItem("insights", "Insights", Icons.Outlined.PieChart),
     )
@@ -70,6 +74,7 @@ fun SpendlyApp(repository: com.example.daily_expenses.data.repository.ExpenseRep
     )
 
     val editingExpense by homeViewModel.editingExpense.collectAsState()
+    val selectedDay by homeViewModel.selectedDay.collectAsState()
     var showAddSheet by remember { mutableStateOf(false) }
     var addSheetInitialBucket by remember { mutableStateOf("Expense") }
 
@@ -113,8 +118,10 @@ fun SpendlyApp(repository: com.example.daily_expenses.data.repository.ExpenseRep
                             label = {
                                 Text(
                                     text = item.label,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             },
                             colors = NavigationBarItemDefaults.colors(
@@ -142,6 +149,21 @@ fun SpendlyApp(repository: com.example.daily_expenses.data.repository.ExpenseRep
                         homeViewModel.setEditingExpense(null)
                         addSheetInitialBucket = "Expense"
                         showAddSheet = true
+                    },
+                    onAddIncomeClick = {
+                        homeViewModel.setEditingExpense(null)
+                        addSheetInitialBucket = "Income"
+                        showAddSheet = true
+                    }
+                )
+            }
+            composable("budget_income") {
+                IncomeScreen(
+                    viewModel = homeViewModel,
+                    onAddIncome = {
+                        homeViewModel.setEditingExpense(null)
+                        addSheetInitialBucket = "Income"
+                        showAddSheet = true
                     }
                 )
             }
@@ -157,6 +179,13 @@ fun SpendlyApp(repository: com.example.daily_expenses.data.repository.ExpenseRep
                         homeViewModel.setEditingExpense(null)
                         addSheetInitialBucket = "Wants"
                         showAddSheet = true
+                    },
+                    onOpenBudgetAndIncome = {
+                        navController.navigate("budget_income") {
+                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
                     }
                 )
             }
@@ -173,11 +202,15 @@ fun SpendlyApp(repository: com.example.daily_expenses.data.repository.ExpenseRep
         AddExpenseSheet(
             editingExpense = editingExpense,
             initialBucket = addSheetInitialBucket,
+            initialDay = selectedDay,
             onDismiss = {
                 showAddSheet = false
                 homeViewModel.setEditingExpense(null)
             },
-            onSave = { amount, category, description, bucket ->
+            onDelete = { expenseToDelete ->
+                homeViewModel.deleteExpense(expenseToDelete)
+            },
+            onSave = { amount, category, description, bucket, dateMillis ->
                 val editing = editingExpense
                 if (editing != null) {
                     homeViewModel.updateExpense(
@@ -185,23 +218,36 @@ fun SpendlyApp(repository: com.example.daily_expenses.data.repository.ExpenseRep
                             amount = amount,
                             category = category,
                             description = description,
-                            bucket = bucket
+                            bucket = bucket,
+                            date = dateMillis
                         )
                     )
                 } else {
-                    if (bucket == "Needs" || bucket == "Wants") {
-                        homeViewModel.addPlannedItem(
-                            title = category,
-                            note = description,
-                            amount = amount,
-                            bucket = bucket
-                        )
-                    } else {
-                        homeViewModel.addDailyExpense(
-                            amount = amount,
-                            category = category,
-                            description = description
-                        )
+                    when (bucket) {
+                        "Needs", "Wants" -> {
+                            homeViewModel.addPlannedItem(
+                                title = category,
+                                note = description,
+                                amount = amount,
+                                bucket = bucket
+                            )
+                        }
+                        "Income" -> {
+                            homeViewModel.addIncome(
+                                amount = amount,
+                                source = category,
+                                note = description,
+                                timestamp = dateMillis
+                            )
+                        }
+                        else -> {
+                            homeViewModel.addDailyExpense(
+                                amount = amount,
+                                category = category,
+                                description = description,
+                                timestamp = dateMillis
+                            )
+                        }
                     }
                 }
                 showAddSheet = false
