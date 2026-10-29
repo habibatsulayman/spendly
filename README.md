@@ -5,11 +5,13 @@
 Spendly is a calm, personal space to track daily spending and plan each month without the clutter of traditional budgeting apps.
 
 <p align="center">
-  <img src="screenshots/home.png" alt="Home Screen" width="260" />
+  <img src="screenshots/home.png" alt="Home Screen" width="200" />
   &nbsp;&nbsp;
-  <img src="screenshots/wants_needs.png" alt="Wants & Needs Screen" width="260" />
+  <img src="screenshots/budget_income.png" alt="Budget & Income Screen" width="200" />
   &nbsp;&nbsp;
-  <img src="screenshots/insights.png" alt="Insights Screen" width="260" />
+  <img src="screenshots/wants_needs.png" alt="Wants & Needs Screen" width="200" />
+  &nbsp;&nbsp;
+  <img src="screenshots/insights.png" alt="Insights Screen" width="200" />
 </p>
 
 ---
