@@ -8,6 +8,7 @@ import com.example.daily_expenses.ui.home.IslamicQuotesProvider
 import com.example.daily_expenses.ui.home.MonthYear
 import com.example.daily_expenses.ui.home.MonthlyBudgetPlan
 import com.example.daily_expenses.ui.home.SelectedDay
+import com.example.daily_expenses.ui.home.calculateWantsAndNeedsAllocation
 import com.example.daily_expenses.ui.home.greetingForHour
 import com.example.daily_expenses.ui.summary.SummaryViewModel
 import kotlinx.coroutines.flow.Flow
@@ -330,5 +331,63 @@ class SpendlyFeaturesTest {
         assertEquals(10_000.0, summary.totalAmount, 0.001)
         assertEquals(3, summary.transactionCount)
         assertFalse(summary.categoryTotals.any { it.category == "Salary" || it.category == "Gift / Dash" })
+    }
+
+    // ─── 7. Wants Exhaustion Overflow Into Needs ────────────────────────────
+
+    @Test
+    fun `when Wants budget is exhausted excess is deducted from Needs and warning state is active`() {
+        // Case 1: Wants not yet exhausted (20,000 sorted of 27,000)
+        val withinBudget = calculateWantsAndNeedsAllocation(
+            needsBudget = 67_500.0,
+            wantsBudget = 27_000.0,
+            needsSortedRaw = 10_000.0,
+            wantsSortedRaw = 20_000.0
+        )
+        assertFalse(withinBudget.isWantsExhausted)
+        assertEquals(0.0, withinBudget.wantsOverflowToNeeds, 0.001)
+        assertEquals(7_000.0, withinBudget.wantsLeft, 0.001)
+        assertEquals(57_500.0, withinBudget.needsLeft, 0.001)
+
+        // Case 2: Wants exceeded (30,100 sorted of 27,000 -> 3,100 overflow deducted from Needs 67,500)
+        val overflowed = calculateWantsAndNeedsAllocation(
+            needsBudget = 67_500.0,
+            wantsBudget = 27_000.0,
+            needsSortedRaw = 0.0,
+            wantsSortedRaw = 30_100.0
+        )
+        assertTrue(overflowed.isWantsExhausted)
+        assertEquals(3_100.0, overflowed.wantsOverflowToNeeds, 0.001)
+        assertEquals(0.0, overflowed.wantsLeft, 0.001)
+        assertEquals(3_100.0, overflowed.effectiveNeedsSorted, 0.001)
+        assertEquals(64_400.0, overflowed.needsLeft, 0.001)
+    }
+
+    // ─── 8. Sadaqah Category & Masjid / Ateeq Classification ────────────────
+
+    @Test
+    fun `Sadaqah category and masjid or ateeq expenses are deducted from Needs and grouped under Sadaqah`() {
+        assertTrue(CategoryHelper.predefinedCategories.contains("Sadaqah"))
+
+        val masjidExpense = Expense(amount = 2_000.0, category = "Other", description = "Masjid donation", bucket = "Expense")
+        val ateeqExpense = Expense(amount = 5_000.0, category = "Other", description = "Ateeq", bucket = "Expense")
+        val directSadaqah = Expense(amount = 1_000.0, category = "Sadaqah", description = "Friday charity", bucket = "Expense")
+        val nonNeedOther = Expense(amount = 3_000.0, category = "Other", description = "Ice cream", bucket = "Expense")
+
+        assertTrue(CategoryHelper.isSadaqahExpense(masjidExpense))
+        assertTrue(CategoryHelper.isSadaqahExpense(ateeqExpense))
+        assertTrue(CategoryHelper.isSadaqahExpense(directSadaqah))
+        assertFalse(CategoryHelper.isSadaqahExpense(nonNeedOther))
+
+        // Deducted from Needs (not Wants)
+        assertTrue(CategoryHelper.isDailyNeedExpense(masjidExpense))
+        assertTrue(CategoryHelper.isDailyNeedExpense(ateeqExpense))
+        assertTrue(CategoryHelper.isDailyNeedExpense(directSadaqah))
+        assertFalse(CategoryHelper.isDailyNeedExpense(nonNeedOther))
+
+        val summaryViewModel = SummaryViewModel(repository)
+        assertEquals("Sadaqah", summaryViewModel.mapToStandardCategory(masjidExpense))
+        assertEquals("Sadaqah", summaryViewModel.mapToStandardCategory(ateeqExpense))
+        assertEquals("Sadaqah", summaryViewModel.mapToStandardCategory(directSadaqah))
     }
 }

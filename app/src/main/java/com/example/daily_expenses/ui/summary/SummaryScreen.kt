@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.sp
 import com.example.daily_expenses.data.model.MonthlyAggregate
 import com.example.daily_expenses.ui.home.HomeViewModel
 import com.example.daily_expenses.ui.home.MonthlyBudgetPlan
+import com.example.daily_expenses.ui.home.calculateWantsAndNeedsAllocation
 import com.example.daily_expenses.ui.home.formatAmount
 import com.example.daily_expenses.ui.theme.SpendlyThemeExtras
 import kotlin.math.abs
@@ -50,8 +51,16 @@ fun SummaryScreen(
     val pastMonths by summaryViewModel.pastMonths.collectAsState()
     val extras = SpendlyThemeExtras.colors
 
-    val needsSorted = needsItems.filter { it.isSorted }.sumOf { it.amount } + dailyNeedsSpent
-    val wantsSorted = wantsItems.filter { it.isSorted }.sumOf { it.amount } + dailyWantsSpent
+    val needsRaw = needsItems.filter { it.isSorted }.sumOf { it.amount } + dailyNeedsSpent
+    val wantsRaw = wantsItems.filter { it.isSorted }.sumOf { it.amount } + dailyWantsSpent
+    val allocation = calculateWantsAndNeedsAllocation(
+        needsBudget = budgetPlan.needsBudget,
+        wantsBudget = budgetPlan.wantsBudget,
+        needsSortedRaw = needsRaw,
+        wantsSortedRaw = wantsRaw
+    )
+    val needsSorted = allocation.effectiveNeedsSorted
+    val wantsSorted = allocation.effectiveWantsCapped
     val investSorted = if (budgetPlan.investmentSorted) budgetPlan.investmentBudget else 0.0
 
     Column(

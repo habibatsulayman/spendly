@@ -2,6 +2,7 @@ package com.example.daily_expenses.ui.summary
 
 import androidx.lifecycle.*
 import com.example.daily_expenses.data.local.Expense
+import com.example.daily_expenses.data.model.CategoryHelper
 import com.example.daily_expenses.data.model.MonthlyAggregate
 import com.example.daily_expenses.data.repository.ExpenseRepository
 import kotlinx.coroutines.flow.*
@@ -70,6 +71,7 @@ class SummaryViewModel(private val repository: ExpenseRepository) : ViewModel() 
     internal fun mapToStandardCategory(expense: Expense): String {
         val text = "${expense.category} ${expense.description}".lowercase()
         return when {
+            CategoryHelper.isSadaqahExpense(expense) -> "Sadaqah"
             expense.category.equals("Food", ignoreCase = true) ||
                 text.contains("food") || text.contains("lunch") || text.contains("dinner") ||
                 text.contains("breakfast") || text.contains("grocer") || text.contains("market") ||
@@ -104,13 +106,12 @@ class SummaryViewModel(private val repository: ExpenseRepository) : ViewModel() 
             }
             .sortedByDescending { it.amount }
 
-        // Consolidate beyond top 3 into "Other" if there are more than 4 categories so the 4-color donut stays clean
-        val finalCategories = if (grouped.size <= 4) {
+        val finalCategories = if (grouped.size <= 5) {
             grouped
         } else {
-            val top3 = grouped.take(3)
-            val restAmount = grouped.drop(3).sumOf { it.amount }
-            top3 + CategorySpend(
+            val top4 = grouped.take(4)
+            val restAmount = grouped.drop(4).sumOf { it.amount }
+            top4 + CategorySpend(
                 category = "Other",
                 amount = restAmount,
                 percentage = if (total > 0) (restAmount / total).toFloat() else 0f

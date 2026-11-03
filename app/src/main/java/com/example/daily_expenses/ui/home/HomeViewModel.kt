@@ -3,6 +3,7 @@ package com.example.daily_expenses.ui.home
 import android.content.Context
 import androidx.lifecycle.*
 import com.example.daily_expenses.data.local.Expense
+import com.example.daily_expenses.data.model.CategoryHelper
 import com.example.daily_expenses.data.repository.ExpenseRepository
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -50,6 +51,50 @@ fun greetingForHour(hourOfDay: Int, userName: String = "Habeebah"): String {
         in 17..20 -> "Good evening, $userName"
         else -> "Good night, $userName"
     }
+}
+
+data class WantsAndNeedsAllocation(
+    val needsSortedRaw: Double,
+    val wantsSortedRaw: Double,
+    val wantsOverflowToNeeds: Double,
+    val effectiveNeedsSorted: Double,
+    val effectiveWantsCapped: Double,
+    val needsLeft: Double,
+    val wantsLeft: Double,
+    val isWantsExhausted: Boolean
+)
+
+fun calculateWantsAndNeedsAllocation(
+    needsBudget: Double,
+    wantsBudget: Double,
+    needsSortedRaw: Double,
+    wantsSortedRaw: Double
+): WantsAndNeedsAllocation {
+    val wantsOverflow = if (wantsBudget > 0.0) {
+        (wantsSortedRaw - wantsBudget).coerceAtLeast(0.0)
+    } else {
+        0.0
+    }
+    val isWantsExhausted = wantsBudget > 0.0 && wantsSortedRaw >= wantsBudget
+    val effectiveNeedsSorted = needsSortedRaw + wantsOverflow
+    val effectiveWantsCapped = if (wantsBudget > 0.0) {
+        wantsSortedRaw.coerceAtMost(wantsBudget)
+    } else {
+        wantsSortedRaw
+    }
+    val needsLeft = needsBudget - effectiveNeedsSorted
+    val wantsLeft = (wantsBudget - wantsSortedRaw).coerceAtLeast(0.0)
+
+    return WantsAndNeedsAllocation(
+        needsSortedRaw = needsSortedRaw,
+        wantsSortedRaw = wantsSortedRaw,
+        wantsOverflowToNeeds = wantsOverflow,
+        effectiveNeedsSorted = effectiveNeedsSorted,
+        effectiveWantsCapped = effectiveWantsCapped,
+        needsLeft = needsLeft,
+        wantsLeft = wantsLeft,
+        isWantsExhausted = isWantsExhausted
+    )
 }
 
 data class SelectedDay(
@@ -230,6 +275,35 @@ class HomeViewModel(
 
     private val prefs = context.getSharedPreferences("spendly_prefs", Context.MODE_PRIVATE)
 
+    init {
+        // Automatically recategorize any existing masjid / ateeq / sadaqah expenses to "Sadaqah" (and Needs)
+        viewModelScope.launch {
+            val all = repository.getAllExpenses().first()
+            all.forEach { expense ->
+                if (expense.bucket != "Income" && CategoryHelper.isSadaqahExpense(expense)) {
+                    if (expense.bucket == "Expense" && expense.category != "Sadaqah") {
+                        val updatedDesc = if (expense.description.isBlank() &&
+                            expense.category != "Other" &&
+                            !expense.category.equals("Sadaqah", ignoreCase = true)
+                        ) {
+                            expense.category
+                        } else {
+                            expense.description
+                        }
+                        repository.addExpense(
+                            expense.copy(
+                                category = "Sadaqah",
+                                description = updatedDesc
+                            )
+                        )
+                    } else if (expense.bucket == "Wants") {
+                        repository.addExpense(expense.copy(bucket = "Needs"))
+                    }
+                }
+            }
+        }
+    }
+
     // ─── Selected Day for Home Screen (defaults to Today) ───────────────────
     private val _selectedDay = MutableStateFlow(SelectedDay.today())
     val selectedDay: StateFlow<SelectedDay> = _selectedDay
@@ -323,12 +397,11 @@ class HomeViewModel(
         .map { list -> list.filter { it.bucket == "Wants" }.sortedBy { it.id } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // Daily expenses ("Expense") mapped to Needs (Food, Transport, Data) or Wants (Other)
+    // Daily expenses ("Expense") mapped to Needs (Food, Transport, Data, Sadaqah) or Wants (Other)
     val dailyNeedsSpent: StateFlow<Double> = selectedMonthItems
         .map { list ->
             list.filter {
-                it.bucket == "Expense" &&
-                    (it.category == "Food" || it.category == "Transport" || it.category == "Data")
+                it.bucket == "Expense" && CategoryHelper.isDailyNeedExpense(it)
             }.sumOf { it.amount }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
@@ -336,8 +409,7 @@ class HomeViewModel(
     val dailyWantsSpent: StateFlow<Double> = selectedMonthItems
         .map { list ->
             list.filter {
-                it.bucket == "Expense" &&
-                    it.category != "Food" && it.category != "Transport" && it.category != "Data"
+                it.bucket == "Expense" && !CategoryHelper.isDailyNeedExpense(it)
             }.sumOf { it.amount }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)

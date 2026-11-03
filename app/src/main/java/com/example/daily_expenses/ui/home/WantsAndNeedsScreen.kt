@@ -21,6 +21,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -215,6 +216,15 @@ fun WantsAndNeedsScreen(
                 )
             }
         } else {
+            val needsRaw = needsItems.filter { it.isSorted }.sumOf { it.amount } + dailyNeedsSpent
+            val wantsRaw = wantsItems.filter { it.isSorted }.sumOf { it.amount } + dailyWantsSpent
+            val allocation = calculateWantsAndNeedsAllocation(
+                needsBudget = budgetPlan.needsBudget,
+                wantsBudget = budgetPlan.wantsBudget,
+                needsSortedRaw = needsRaw,
+                wantsSortedRaw = wantsRaw
+            )
+
             // ── Populated State (Pages 3 & 7) ───────────────────────────────
             LazyColumn(
                 modifier = Modifier.weight(1f),
@@ -226,7 +236,12 @@ fun WantsAndNeedsScreen(
                     BucketChecklistSection(
                         headerLabel = "NEEDS",
                         budget = budgetPlan.needsBudget,
-                        extraDailySpent = dailyNeedsSpent,
+                        extraDailySpent = dailyNeedsSpent + allocation.wantsOverflowToNeeds,
+                        subtitleSuffix = if (allocation.wantsOverflowToNeeds > 0) {
+                            " · includes ₦${formatAmount(allocation.wantsOverflowToNeeds)} from Wants"
+                        } else {
+                            ""
+                        },
                         items = needsItems,
                         addLabel = "+ Add a need",
                         onToggleItem = { viewModel.toggleExpenseSorted(it) },
@@ -238,10 +253,22 @@ fun WantsAndNeedsScreen(
 
                 // WANTS Section
                 item {
+                    val wantsWarning = if (allocation.isWantsExhausted) {
+                        if (allocation.wantsOverflowToNeeds > 0) {
+                            "No money left for wants — ₦${formatAmount(allocation.wantsOverflowToNeeds)} has been deducted from your Needs budget."
+                        } else {
+                            "No money left for wants — any extra want will be deducted from your Needs budget."
+                        }
+                    } else {
+                        null
+                    }
+
                     BucketChecklistSection(
                         headerLabel = "WANTS",
                         budget = budgetPlan.wantsBudget,
                         extraDailySpent = dailyWantsSpent,
+                        clampLeftAtZero = true,
+                        warningMessage = wantsWarning,
                         items = wantsItems,
                         addLabel = "+ Add a want",
                         onToggleItem = { viewModel.toggleExpenseSorted(it) },
@@ -272,6 +299,9 @@ private fun BucketChecklistSection(
     headerLabel: String,
     budget: Double,
     extraDailySpent: Double = 0.0,
+    clampLeftAtZero: Boolean = false,
+    subtitleSuffix: String = "",
+    warningMessage: String? = null,
     items: List<Expense>,
     addLabel: String,
     onToggleItem: (Expense) -> Unit,
@@ -280,7 +310,8 @@ private fun BucketChecklistSection(
     onAddClick: () -> Unit
 ) {
     val sortedTotal = items.filter { it.isSorted }.sumOf { it.amount } + extraDailySpent
-    val left = (budget - sortedTotal)
+    val rawLeft = budget - sortedTotal
+    val left = if (clampLeftAtZero) rawLeft.coerceAtLeast(0.0) else rawLeft
     val progress = if (budget > 0) (sortedTotal / budget).toFloat().coerceIn(0f, 1f) else 0f
     val animatedProgress by animateFloatAsState(
         targetValue = progress,
@@ -307,7 +338,7 @@ private fun BucketChecklistSection(
                 },
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground
+                color = if (warningMessage != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onBackground
             )
         }
 
@@ -325,17 +356,53 @@ private fun BucketChecklistSection(
                     .fillMaxWidth(animatedProgress)
                     .fillMaxHeight()
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary)
+                    .background(if (warningMessage != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
             )
         }
 
         Spacer(modifier = Modifier.height(6.dp))
 
+        val subtitleText = if (clampLeftAtZero && budget > 0 && sortedTotal >= budget) {
+            "₦${formatAmount(budget)} sorted"
+        } else {
+            "₦${formatAmount(sortedTotal)} sorted of ₦${formatAmount(budget)}$subtitleSuffix"
+        }
+
         Text(
-            text = "₦${formatAmount(sortedTotal)} sorted of ₦${formatAmount(budget)}",
+            text = subtitleText,
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+
+        if (warningMessage != null) {
+            Spacer(modifier = Modifier.height(10.dp))
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                color = MaterialTheme.colorScheme.errorContainer,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.35f))
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.WarningAmber,
+                        contentDescription = "Wants budget exhausted",
+                        tint = MaterialTheme.colorScheme.onErrorContainer,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Text(
+                        text = warningMessage,
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontWeight = FontWeight.Medium
+                        ),
+                        color = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                }
+            }
+        }
 
         Spacer(modifier = Modifier.height(10.dp))
 
