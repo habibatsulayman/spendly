@@ -18,7 +18,8 @@ data class MonthlyBudgetPlan(
     val needsRatio: Int = 50,
     val investmentRatio: Int = 30,
     val wantsRatio: Int = 20,
-    val investmentSorted: Boolean = false
+    val investmentSorted: Boolean = false,
+    val investmentSortedAt: Long = 0L
 ) {
     val totalAllocated: Double
         get() = needsBudget + wantsBudget + investmentBudget
@@ -36,7 +37,8 @@ data class MonthlyBudgetPlan(
                 needsRatio = needsRatio,
                 investmentRatio = investmentRatio,
                 wantsRatio = wantsRatio,
-                investmentSorted = investmentSorted
+                investmentSorted = investmentSorted,
+                investmentSortedAt = investmentSortedAt
             )
         } else {
             this
@@ -275,7 +277,19 @@ class HomeViewModel(
 
     private val prefs = context.getSharedPreferences("spendly_prefs", Context.MODE_PRIVATE)
 
+    private val _budgetVersion = MutableStateFlow(0L)
+    val budgetVersion: StateFlow<Long> = _budgetVersion
+
     init {
+        // Clear any auto-backfilled investment timestamps for October & November 2026
+        if (!prefs.getBoolean("cleared_oct_nov_2026_invest_dates_v1", false)) {
+            prefs.edit()
+                .remove("budget_2026_9_invest_sorted_at")
+                .remove("budget_2026_10_invest_sorted_at")
+                .putBoolean("cleared_oct_nov_2026_invest_dates_v1", true)
+                .apply()
+        }
+
         // Automatically recategorize any existing masjid / ateeq / sadaqah expenses to "Sadaqah" (and Needs)
         viewModelScope.launch {
             val all = repository.getAllExpenses().first()
@@ -457,6 +471,14 @@ class HomeViewModel(
         }
 
         val investSorted = prefs.getBoolean("${p}invest_sorted", false)
+        // Do NOT auto-backfill a timestamp for October (month 9) or November (month 10) 2026;
+        // only show a timestamp when explicitly ticked going forward.
+        val isLegacyTimelessMonth = m.year == 2026 && (m.month == Calendar.OCTOBER || m.month == Calendar.NOVEMBER)
+        val investSortedAt = if (isLegacyTimelessMonth) {
+            0L
+        } else {
+            prefs.getLong("${p}invest_sorted_at", 0L)
+        }
         return MonthlyBudgetPlan(
             income = income,
             needsBudget = needs,
@@ -465,8 +487,14 @@ class HomeViewModel(
             needsRatio = needsRatio,
             investmentRatio = investRatio,
             wantsRatio = wantsRatio,
-            investmentSorted = investSorted
+            investmentSorted = investSorted,
+            investmentSortedAt = investSortedAt
         )
+    }
+
+    fun getSortedInvestmentForMonth(year: Int, month: Int, loggedIncome: Double): Double {
+        val plan = loadBudgetPlanFor(MonthYear(year, month)).withLoggedIncome(loggedIncome)
+        return if (plan.investmentSorted) plan.investmentBudget else 0.0
     }
 
     private fun refreshBudgetPlan() {
@@ -485,6 +513,7 @@ class HomeViewModel(
         val m = _selectedMonth.value
         val p = keyPrefix(m)
         val currentSorted = _storedBudgetPlan.value.investmentSorted
+        val currentSortedAt = _storedBudgetPlan.value.investmentSortedAt
         prefs.edit()
             .putFloat("${p}income", income.toFloat())
             .putFloat("${p}needs", needs.toFloat())
@@ -505,16 +534,27 @@ class HomeViewModel(
             needsRatio = needsRatio,
             investmentRatio = investmentRatio,
             wantsRatio = wantsRatio,
-            investmentSorted = currentSorted
+            investmentSorted = currentSorted,
+            investmentSortedAt = currentSortedAt
         )
+        _budgetVersion.value += 1
     }
 
     fun toggleInvestmentSorted() {
         val m = _selectedMonth.value
         val p = keyPrefix(m)
         val next = !_storedBudgetPlan.value.investmentSorted
-        prefs.edit().putBoolean("${p}invest_sorted", next).apply()
-        _storedBudgetPlan.value = _storedBudgetPlan.value.copy(investmentSorted = next)
+        val isLegacyTimelessMonth = m.year == 2026 && (m.month == Calendar.OCTOBER || m.month == Calendar.NOVEMBER)
+        val sortedAt = if (next && !isLegacyTimelessMonth) System.currentTimeMillis() else 0L
+        prefs.edit()
+            .putBoolean("${p}invest_sorted", next)
+            .putLong("${p}invest_sorted_at", sortedAt)
+            .apply()
+        _storedBudgetPlan.value = _storedBudgetPlan.value.copy(
+            investmentSorted = next,
+            investmentSortedAt = sortedAt
+        )
+        _budgetVersion.value += 1
     }
 
     fun getPreviousMonthPlan(): MonthlyBudgetPlan {

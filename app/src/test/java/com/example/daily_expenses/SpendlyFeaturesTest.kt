@@ -390,4 +390,76 @@ class SpendlyFeaturesTest {
         assertEquals("Sadaqah", summaryViewModel.mapToStandardCategory(ateeqExpense))
         assertEquals("Sadaqah", summaryViewModel.mapToStandardCategory(directSadaqah))
     }
+
+    // ─── 9. Sorted Investment Reflects in Spent This Month & Transactions List ─
+
+    @Test
+    fun `when Investment is ticked as sorted it is included in Spent this month total and transactions list`() {
+        val summaryViewModel = SummaryViewModel(repository)
+        val nov2026 = Calendar.getInstance().apply {
+            set(2026, Calendar.NOVEMBER, 10, 12, 0, 0)
+        }.timeInMillis
+
+        val entries = listOf(
+            Expense(id = 1, amount = 10_000.0, category = "Crochet bag", description = "Part payment", date = nov2026, bucket = "Wants", isSorted = true),
+            Expense(id = 2, amount = 5_000.0, category = "Skincare", description = "Part payment", date = nov2026, bucket = "Wants", isSorted = true),
+            Expense(id = 3, amount = 12_000.0, category = "Type C Mac cord", description = "", date = nov2026, bucket = "Needs", isSorted = false)
+        )
+
+        // When Investment is NOT ticked yet (investmentSortedAmount = 0.0)
+        val summaryWithoutInvest = summaryViewModel.buildSummary(entries, investmentSortedAmount = 0.0)
+        assertEquals(15_000.0, summaryWithoutInvest.totalAmount, 0.001)
+        assertEquals(2, summaryWithoutInvest.transactionCount)
+        assertEquals(2, summaryWithoutInvest.transactions.size)
+
+        // When Investment (e.g., 40,500) IS ticked as sorted with a specific timestamp (e.g., Dec 2026+)
+        val tickedTimestamp = nov2026 + 3_600_000L // 1 hour later
+        val summaryWithInvest = summaryViewModel.buildSummary(
+            entries,
+            investmentSortedAmount = 40_500.0,
+            investmentSortedAt = tickedTimestamp
+        )
+        assertEquals(55_500.0, summaryWithInvest.totalAmount, 0.001)
+        assertEquals(3, summaryWithInvest.transactionCount)
+        assertEquals(3, summaryWithInvest.transactions.size)
+        val investItem = summaryWithInvest.transactions.first { it.bucket == "Investment" }
+        assertEquals(40_500.0, investItem.amount, 0.001)
+        assertEquals(tickedTimestamp, investItem.date)
+        assertTrue(summaryWithInvest.categoryTotals.any { it.category == "Investment" && it.amount == 40_500.0 })
+
+        // When Investment is sorted for October / November 2026 (investmentSortedAt = 0L),
+        // it has date = 0L (no date line shown) and stays at the top of the transaction list
+        val summaryLegacyTimeless = summaryViewModel.buildSummary(
+            entries,
+            investmentSortedAmount = 40_500.0,
+            investmentSortedAt = 0L
+        )
+        assertEquals(55_500.0, summaryLegacyTimeless.totalAmount, 0.001)
+        assertEquals("Investment", summaryLegacyTimeless.transactions.first().bucket)
+        assertEquals(0L, summaryLegacyTimeless.transactions.first().date)
+    }
+
+    @Test
+    fun `pastMonths includes sorted Investment amount for each past month`() = runBlocking {
+        val oct2026 = Calendar.getInstance().apply {
+            set(2026, Calendar.OCTOBER, 15, 12, 0, 0)
+        }.timeInMillis
+
+        // October has 78,300 in expenses + 40,500 sorted investment = 118,800
+        repository.addExpense(
+            Expense(amount = 78_300.0, category = "Food", description = "October expenses", date = oct2026, bucket = "Expense", isSorted = true)
+        )
+
+        val summaryViewModel = SummaryViewModel(repository)
+        val allExpenses = repository.getAllExpenses().first()
+        val pastList = summaryViewModel.computePastMonths(
+            allExpenses = allExpenses,
+            selected = com.example.daily_expenses.ui.summary.AvailableMonth("November 2026", 2026, Calendar.NOVEMBER),
+            investmentProvider = { year, month, _ ->
+                if (year == 2026 && month == Calendar.OCTOBER) 40_500.0 else 0.0
+            }
+        )
+        val octAggregate = pastList.first { it.year == 2026 && it.monthInt == Calendar.OCTOBER }
+        assertEquals(118_800.0, octAggregate.totalAmount, 0.001)
+    }
 }

@@ -12,7 +12,8 @@ import java.util.*
 data class MonthlySummary(
     val totalAmount: Double,
     val transactionCount: Int,
-    val categoryTotals: List<CategorySpend>
+    val categoryTotals: List<CategorySpend>,
+    val transactions: List<Expense> = emptyList()
 )
 
 data class CategorySpend(
@@ -41,6 +42,19 @@ class SummaryViewModel(private val repository: ExpenseRepository) : ViewModel() 
     )
     val selectedMonth: StateFlow<AvailableMonth> = _selectedMonth
 
+    private val _investmentSortedAmount = MutableStateFlow(0.0)
+    private val _investmentSortedAt = MutableStateFlow(0L)
+    private val _pastMonthsRevision = MutableStateFlow(0L)
+    private var pastMonthInvestmentProvider: ((year: Int, month: Int, loggedIncome: Double) -> Double)? = null
+
+    fun setPastMonthInvestmentProvider(
+        revision: Long = 0L,
+        provider: (year: Int, month: Int, loggedIncome: Double) -> Double
+    ) {
+        pastMonthInvestmentProvider = provider
+        _pastMonthsRevision.value = revision
+    }
+
     fun selectMonth(year: Int, month: Int) {
         val cal = Calendar.getInstance().apply { set(year, month, 1) }
         _selectedMonth.value = AvailableMonth(
@@ -50,18 +64,26 @@ class SummaryViewModel(private val repository: ExpenseRepository) : ViewModel() 
         )
     }
 
-    // ── Summary for selected month (Daily expenses + sorted Needs & Wants) ──
+    fun setInvestmentSortedAmount(amount: Double, sortedAt: Long = 0L) {
+        _investmentSortedAmount.value = amount
+        _investmentSortedAt.value = sortedAt
+    }
+
+    // ── Summary for selected month (Daily expenses + sorted Needs, Wants & Investment) ──
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
-    val monthlySummary: StateFlow<MonthlySummary> = _selectedMonth
-        .flatMapLatest { selected ->
+    val monthlySummary: StateFlow<MonthlySummary> = combine(
+        _selectedMonth.flatMapLatest { selected ->
             repository.getExpensesForMonth(selected.year, selected.month)
-                .map { expenses -> buildSummary(expenses) }
-        }
-        .stateIn(
-            viewModelScope,
-            SharingStarted.WhileSubscribed(5000),
-            MonthlySummary(0.0, 0, emptyList())
-        )
+        },
+        _investmentSortedAmount,
+        _investmentSortedAt
+    ) { expenses, investAmount, investSortedAt ->
+        buildSummary(expenses, investAmount, investSortedAt)
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        MonthlySummary(0.0, 0, emptyList(), emptyList())
+    )
 
     internal fun isActualSpend(expense: Expense): Boolean {
         if (expense.bucket == "Income") return false
@@ -71,6 +93,7 @@ class SummaryViewModel(private val repository: ExpenseRepository) : ViewModel() 
     internal fun mapToStandardCategory(expense: Expense): String {
         val text = "${expense.category} ${expense.description}".lowercase()
         return when {
+            expense.bucket == "Investment" || expense.category.equals("Investment", ignoreCase = true) -> "Investment"
             CategoryHelper.isSadaqahExpense(expense) -> "Sadaqah"
             expense.category.equals("Food", ignoreCase = true) ||
                 text.contains("food") || text.contains("lunch") || text.contains("dinner") ||
@@ -89,10 +112,38 @@ class SummaryViewModel(private val repository: ExpenseRepository) : ViewModel() 
         }
     }
 
-    internal fun buildSummary(expenses: List<Expense>): MonthlySummary {
+    internal fun buildSummary(
+        expenses: List<Expense>,
+        investmentSortedAmount: Double = 0.0,
+        investmentSortedAt: Long = 0L
+    ): MonthlySummary {
         val nonIncomeExpenses = expenses.filter { it.bucket != "Income" }
-        // Include daily expenses + sorted Wants & Needs items; if nothing is sorted yet, fall back to all items in the month so the chart and total reflect what was entered
-        val countedExpenses = nonIncomeExpenses.filter { isActualSpend(it) }.ifEmpty { nonIncomeExpenses }
+        val actualSpent = nonIncomeExpenses.filter { isActualSpend(it) }
+        val baseCounted = if (actualSpent.isEmpty() && investmentSortedAmount <= 0.0) {
+            nonIncomeExpenses
+        } else {
+            actualSpent
+        }
+
+        val countedExpenses = if (investmentSortedAmount > 0.0) {
+            val investExpense = Expense(
+                id = -1L,
+                amount = investmentSortedAmount,
+                category = "Investment",
+                description = "Set aside when pay lands",
+                date = investmentSortedAt,
+                bucket = "Investment",
+                isSorted = true
+            )
+            if (investmentSortedAt > 0L) {
+                (listOf(investExpense) + baseCounted).sortedByDescending { it.date }
+            } else {
+                listOf(investExpense) + baseCounted.sortedByDescending { it.date }
+            }
+        } else {
+            baseCounted.sortedByDescending { it.date }
+        }
+
         val total = countedExpenses.sumOf { it.amount }
 
         val grouped = countedExpenses.groupBy { mapToStandardCategory(it) }
@@ -121,16 +172,18 @@ class SummaryViewModel(private val repository: ExpenseRepository) : ViewModel() 
         return MonthlySummary(
             totalAmount = total,
             transactionCount = countedExpenses.size,
-            categoryTotals = finalCategories
+            categoryTotals = finalCategories,
+            transactions = countedExpenses
         )
     }
 
     // ── Past months aggregates ──────────────────────────────────────────────
-    val pastMonths: StateFlow<List<MonthlyAggregate>> = combine(
-        repository.getAllExpensesFlow(),
-        _selectedMonth
-    ) { allExpenses, selected ->
-        allExpenses
+    internal fun computePastMonths(
+        allExpenses: List<Expense>,
+        selected: AvailableMonth,
+        investmentProvider: ((year: Int, month: Int, loggedIncome: Double) -> Double)? = pastMonthInvestmentProvider
+    ): List<MonthlyAggregate> {
+        return allExpenses
             .groupBy {
                 val cal = Calendar.getInstance().apply { timeInMillis = it.date }
                 "${cal.get(Calendar.YEAR)}-${cal.get(Calendar.MONTH)}"
@@ -141,9 +194,17 @@ class SummaryViewModel(private val repository: ExpenseRepository) : ViewModel() 
                 val month = parts[1].toInt()
                 if (year == selected.year && month == selected.month) return@mapNotNull null
 
+                val loggedIncome = list.filter { it.bucket == "Income" }.sumOf { it.amount }
+                val investSorted = investmentProvider?.invoke(year, month, loggedIncome) ?: 0.0
+
                 val nonIncome = list.filter { it.bucket != "Income" }
-                val counted = nonIncome.filter { isActualSpend(it) }.ifEmpty { nonIncome }
-                val sum = counted.sumOf { it.amount }
+                val actualSpent = nonIncome.filter { isActualSpend(it) }
+                val counted = if (actualSpent.isEmpty() && investSorted <= 0.0) {
+                    nonIncome
+                } else {
+                    actualSpent
+                }
+                val sum = counted.sumOf { it.amount } + investSorted
                 if (sum <= 0.0) return@mapNotNull null
 
                 val cal = Calendar.getInstance().apply { set(year, month, 1) }
@@ -155,6 +216,14 @@ class SummaryViewModel(private val repository: ExpenseRepository) : ViewModel() 
                 )
             }
             .sortedWith(compareByDescending<MonthlyAggregate> { it.year }.thenByDescending { it.monthInt })
+    }
+
+    val pastMonths: StateFlow<List<MonthlyAggregate>> = combine(
+        repository.getAllExpensesFlow(),
+        _selectedMonth,
+        _pastMonthsRevision
+    ) { allExpenses, selected, _ ->
+        computePastMonths(allExpenses, selected)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 }
 
