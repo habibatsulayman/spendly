@@ -48,10 +48,12 @@ data class MonthlyBudgetPlan(
 
 fun greetingForHour(hourOfDay: Int, userName: String = "Habeebah"): String {
     return when (hourOfDay) {
-        in 5..11 -> "Good morning, $userName"
-        in 12..16 -> "Good afternoon, $userName"
-        in 17..20 -> "Good evening, $userName"
-        else -> "Good night, $userName"
+        in 5..8 -> "Assalamu alaykum, dear $userName"
+        in 9..11 -> "Assalamu alaykum, $userName"
+        in 12..14 -> "Assalamu alaykum, lovely"
+        in 15..17 -> "Assalamu alaykum, sweet $userName"
+        in 18..20 -> "Assalamu alaykum, Habibti"
+        else -> "Assalamu alaykum, dearest"
     }
 }
 
@@ -213,6 +215,66 @@ data class IslamicQuote(
 object IslamicQuotesProvider {
     val quotes = listOf(
         IslamicQuote(
+            "“Charity does not decrease wealth.”",
+            "Prophet Muhammad ﷺ · Sahih Muslim"
+        ),
+        IslamicQuote(
+            "“Richness is not having many possessions, but richness is the contentment of the soul.”",
+            "Prophet Muhammad ﷺ · Sahih al-Bukhari"
+        ),
+        IslamicQuote(
+            "“The upper (giving) hand is better than the lower (receiving) hand, and start with those for whom you are responsible.”",
+            "Prophet Muhammad ﷺ · Sahih al-Bukhari"
+        ),
+        IslamicQuote(
+            "“Every day two angels descend, and one of them says: ‘O Allah, compensate every person who spends in Your cause.’”",
+            "Prophet Muhammad ﷺ · Sahih al-Bukhari"
+        ),
+        IslamicQuote(
+            "“Allah said: ‘Spend, O son of Adam, and I shall spend on you.’”",
+            "Hadith Qudsi · Sahih al-Bukhari & Muslim"
+        ),
+        IslamicQuote(
+            "“How excellent is righteous wealth in the hands of a righteous person!”",
+            "Prophet Muhammad ﷺ · Musnad Ahmad"
+        ),
+        IslamicQuote(
+            "“The believer’s shade on the Day of Resurrection will be their charity.”",
+            "Prophet Muhammad ﷺ · Jami` at-Tirmidhi"
+        ),
+        IslamicQuote(
+            "“Protect yourself from the Hellfire even with half a date in charity.”",
+            "Prophet Muhammad ﷺ · Sahih al-Bukhari"
+        ),
+        IslamicQuote(
+            "“Nobody has ever eaten a better meal than that which one has earned by working with one’s own hands.”",
+            "Prophet Muhammad ﷺ · Sahih al-Bukhari"
+        ),
+        IslamicQuote(
+            "“When a Muslim spends something on their family intending to receive Allah’s reward, it is regarded as charity for them.”",
+            "Prophet Muhammad ﷺ · Sahih al-Bukhari"
+        ),
+        IslamicQuote(
+            "“Give charity without delay, for it stands in the way of calamity.”",
+            "Prophet Muhammad ﷺ · Al-Tirmidhi"
+        ),
+        IslamicQuote(
+            "“Whoever pays off their debt intending to repay it, Allah will pay it off for them.”",
+            "Prophet Muhammad ﷺ · Sahih al-Bukhari"
+        ),
+        IslamicQuote(
+            "“Eat, drink, give charity, and wear good clothes, as long as it does not involve extravagance or arrogance.”",
+            "Prophet Muhammad ﷺ · Sunan an-Nasa'i"
+        ),
+        IslamicQuote(
+            "“The most beloved of deeds to Allah are those that are most consistent, even if they are small.”",
+            "Prophet Muhammad ﷺ · Sahih al-Bukhari"
+        ),
+        IslamicQuote(
+            "“Whoever is pleased that their provision be expanded and their life span extended, let them keep ties of kinship.”",
+            "Prophet Muhammad ﷺ · Sahih al-Bukhari"
+        ),
+        IslamicQuote(
             "“And whoever puts their trust in Allah, then He will suffice him.”",
             "Qur'an 65:3"
         ),
@@ -221,44 +283,32 @@ object IslamicQuotesProvider {
             "Qur'an 14:7"
         ),
         IslamicQuote(
-            "“Charity does not decrease wealth.”",
-            "Prophet Muhammad ﷺ · Sahih Muslim"
-        ),
-        IslamicQuote(
-            "“Verily, with hardship comes ease.”",
-            "Qur'an 94:6"
-        ),
-        IslamicQuote(
-            "“Richness is not having many possessions, but richness is the contentment of the soul.”",
-            "Prophet Muhammad ﷺ · Sahih al-Bukhari"
-        ),
-        IslamicQuote(
-            "“And there is no creature on earth but that upon Allah is its provision.”",
-            "Qur'an 11:6"
-        ),
-        IslamicQuote(
-            "“Allah does not burden a soul beyond that it can bear.”",
-            "Qur'an 2:286"
-        ),
-        IslamicQuote(
-            "“Unquestionably, by the remembrance of Allah hearts are assured.”",
-            "Qur'an 13:28"
+            "“And those who, when they spend, are neither extravagant nor niggardly, but hold a medium way between those.”",
+            "Qur'an 25:67"
         ),
         IslamicQuote(
             "“And spend in the way of Allah and do not throw yourselves into destruction, and do good; indeed, Allah loves the doers of good.”",
             "Qur'an 2:195"
         ),
         IslamicQuote(
-            "“And those who, when they spend, are neither extravagant nor niggardly, but hold a medium way between those.”",
-            "Qur'an 25:67"
-        ),
-        IslamicQuote(
-            "“Indeed, my Lord expands provision for whom He wills and restricts it.”",
+            "“Indeed, my Lord expands provision for whom He wills and restricts it. And whatever thing you spend, He will compensate it.”",
             "Qur'an 34:39"
         ),
         IslamicQuote(
-            "“Whoever is pleased that his provision be expanded and his life span extended, let him keep ties of kinship.”",
-            "Prophet Muhammad ﷺ · Sahih al-Bukhari"
+            "“The example of those who spend their wealth in the way of Allah is like a seed of grain which grows seven spikes; in each spike is a hundred grains.”",
+            "Qur'an 2:261"
+        ),
+        IslamicQuote(
+            "“And there is no creature on earth but that upon Allah is its provision.”",
+            "Qur'an 11:6"
+        ),
+        IslamicQuote(
+            "“Verily, with hardship comes ease.”",
+            "Qur'an 94:6"
+        ),
+        IslamicQuote(
+            "“Unquestionably, by the remembrance of Allah hearts are assured.”",
+            "Qur'an 13:28"
         )
     )
 

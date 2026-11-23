@@ -118,12 +118,7 @@ class SummaryViewModel(private val repository: ExpenseRepository) : ViewModel() 
         investmentSortedAt: Long = 0L
     ): MonthlySummary {
         val nonIncomeExpenses = expenses.filter { it.bucket != "Income" }
-        val actualSpent = nonIncomeExpenses.filter { isActualSpend(it) }
-        val baseCounted = if (actualSpent.isEmpty() && investmentSortedAmount <= 0.0) {
-            nonIncomeExpenses
-        } else {
-            actualSpent
-        }
+        val baseCounted = nonIncomeExpenses.filter { isActualSpend(it) }
 
         val countedExpenses = if (investmentSortedAmount > 0.0) {
             val investExpense = Expense(
@@ -192,18 +187,16 @@ class SummaryViewModel(private val repository: ExpenseRepository) : ViewModel() 
                 val parts = key.split("-")
                 val year = parts[0].toInt()
                 val month = parts[1].toInt()
-                if (year == selected.year && month == selected.month) return@mapNotNull null
+                // Only include months strictly before the currently selected month in "Past months"
+                if (year > selected.year || (year == selected.year && month >= selected.month)) {
+                    return@mapNotNull null
+                }
 
                 val loggedIncome = list.filter { it.bucket == "Income" }.sumOf { it.amount }
                 val investSorted = investmentProvider?.invoke(year, month, loggedIncome) ?: 0.0
 
                 val nonIncome = list.filter { it.bucket != "Income" }
-                val actualSpent = nonIncome.filter { isActualSpend(it) }
-                val counted = if (actualSpent.isEmpty() && investSorted <= 0.0) {
-                    nonIncome
-                } else {
-                    actualSpent
-                }
+                val counted = nonIncome.filter { isActualSpend(it) }
                 val sum = counted.sumOf { it.amount } + investSorted
                 if (sum <= 0.0) return@mapNotNull null
 

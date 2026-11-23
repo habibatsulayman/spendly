@@ -31,6 +31,7 @@ import com.example.daily_expenses.ui.home.HomeScreen
 import com.example.daily_expenses.ui.home.HomeViewModel
 import com.example.daily_expenses.ui.home.HomeViewModelFactory
 import com.example.daily_expenses.ui.home.IncomeScreen
+import com.example.daily_expenses.ui.home.SelectedDay
 import com.example.daily_expenses.ui.home.WantsAndNeedsScreen
 import com.example.daily_expenses.ui.summary.SummaryScreen
 import com.example.daily_expenses.ui.summary.SummaryViewModel
@@ -75,6 +76,7 @@ fun SpendlyApp(repository: com.example.daily_expenses.data.repository.ExpenseRep
 
     val editingExpense by homeViewModel.editingExpense.collectAsState()
     val selectedDay by homeViewModel.selectedDay.collectAsState()
+    val selectedMonth by homeViewModel.selectedMonth.collectAsState()
     var showAddSheet by remember { mutableStateOf(false) }
     var addSheetInitialBucket by remember { mutableStateOf("Expense") }
 
@@ -199,10 +201,24 @@ fun SpendlyApp(repository: com.example.daily_expenses.data.repository.ExpenseRep
     }
 
     if (showAddSheet) {
+        val initialDayForSheet = remember(addSheetInitialBucket, selectedDay, selectedMonth) {
+            if (addSheetInitialBucket == "Income") {
+                val nowCal = java.util.Calendar.getInstance()
+                if (nowCal.get(java.util.Calendar.YEAR) == selectedMonth.year &&
+                    nowCal.get(java.util.Calendar.MONTH) == selectedMonth.month
+                ) {
+                    SelectedDay.today()
+                } else {
+                    SelectedDay(selectedMonth.year, selectedMonth.month, 1)
+                }
+            } else {
+                selectedDay
+            }
+        }
         AddExpenseSheet(
             editingExpense = editingExpense,
             initialBucket = addSheetInitialBucket,
-            initialDay = selectedDay,
+            initialDay = initialDayForSheet,
             onDismiss = {
                 showAddSheet = false
                 homeViewModel.setEditingExpense(null)

@@ -105,7 +105,9 @@ fun AddExpenseSheet(
             chosenDay.month,
             chosenDay.dayOfMonth
         ).apply {
-            datePicker.maxDate = System.currentTimeMillis()
+            if (!isIncome) {
+                datePicker.maxDate = System.currentTimeMillis()
+            }
         }.show()
     }
 

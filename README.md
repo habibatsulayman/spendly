@@ -35,12 +35,12 @@ Because I am the only user I had to design for, I could make strong choices: no 
 | Feature | What it does |
 | --- | --- |
 | **Daily spending & past-day logging** | Track today's total on the home screen, or select any previous date from the calendar to view or log forgotten daily expenses. |
-| **Welcome greeting & Islamic reminders** | Time-of-day greeting (`Good morning/afternoon/evening/night, Habeebah`) paired with soul-lifting Qur'an and Hadith quotes that rotate every 3 hours (or cycle on tap). |
-| **Quick add keypad** | Log an expense or income using a custom number pad, category chips, date selector, and an optional note. |
-| **Budget & Income screen** | Log multiple income streams as they come in (`Salary`, `Gift / Dash`, `Side Gig`, `Other`). Your monthly total and **50:30:20** (or custom ratio) split update automatically. |
+| **Taslim greeting & Islamic reminders** | Warm taslim greeting (`Assalamu alaykum, Habeebah` / `dear Habeebah` / `Habibti` / `lovely` / `dearest`) paired with 24 soul-lifting Qur'an and Hadith reminders on wealth, charity, and barakah that rotate every 3 hours (or cycle on tap). |
+| **Quick add keypad** | Log an expense (`Food`, `Transport`, `Data`, `Sadaqah`, `Other`) or income stream using a custom number pad, category chips, date selector, and an optional note. |
+| **Budget & Income screen** | Log multiple income streams as they come in (`Salary`, `Gift / Dash`, `Side Gig`, `Other`)—even ahead of time for an upcoming month. Your monthly total and **50:30:20** (or custom ratio) split update automatically. |
 | **Wants & Needs checklist** | A dedicated monthly checklist for Needs, Wants, and Investment. Add items, tick them off when sorted, edit or delete items with one tap, or carry over unsorted items from last month. |
-| **Live budget tracking** | As you tick items off, each category updates in real time to show how much is left of its budget. |
-| **Merged Insights & History** | One screen: this month's total, a category donut chart, 50:30:20 budget progress, and a list of past months with `% vs prev` badges. |
+| **Live budget tracking & Wants overflow protection** | As you tick items off, each category updates in real time. Daily `Food`, `Transport`, `Data`, and `Sadaqah` expenses automatically deduct from **Needs**, while `Other` expenses deduct from **Wants**. When **Wants** reaches ₦0 left, a warning banner appears and any excess automatically overflows into **Needs**. |
+| **Merged Insights, Monthly Transactions & History** | One screen: this month's total (including sorted Investment), tap `"Spent this month"` to open a full-screen list of all monthly transactions, a category donut chart, 50:30:20 budget progress, and a list of past months with `% vs prev` badges. |
 | **Light & Dark themes** | Warm beige with forest & sage accents in light mode, and deep forest with sage accents in dark mode. |
 | **App icon** | A progress ring with a tick: a month getting sorted. |
 
@@ -50,7 +50,7 @@ Because I am the only user I had to design for, I could make strong choices: no 
 
 By default, Spendly uses the **50:30:20** rule (**Needs : Investment : Wants**), or you can switch to a **custom ratio** if you prefer your own percentage split:
 
-- **50% Needs** (or custom %): rent, food, transport, data, anything you cannot skip
+- **50% Needs** (or custom %): rent, food, transport, data, sadaqah, and anything you cannot skip
 - **30% Investment** (or custom %): savings and investing, set aside first
 - **20% Wants** (or custom %): things you would like but could live without
 
@@ -62,9 +62,11 @@ You can log individual income streams (`Salary`, `Gift / Dash`, `Side Gig`, `Oth
 | Investment | 30% | ₦36,000 |
 | Wants | 20% | ₦24,000 |
 
-**Left = budget minus the total of items you have ticked as sorted.**
+**Left = budget minus the total of items you have ticked as sorted (plus daily expenses in that bucket).**
 
-If Rent (₦30,000) and Data (₦4,000) are ticked under Needs, you have sorted ₦34,000 and have ₦26,000 left of ₦60,000. Unticked items are planned, not spent, so they do not reduce what is left until you sort them.
+- Daily expenses logged under **Food**, **Transport**, **Data**, and **Sadaqah** are automatically deducted from **Needs**, while **Other** daily expenses are deducted from **Wants**.
+- If **Wants** reaches ₦0 left, Spendly displays a warning banner that your Wants budget is exhausted and automatically deducts any excess Wants spending from **Needs**.
+- Once **Investment** is ticked as sorted, it is also counted in **"Spent this month"** and appears in the monthly transaction list and **Past months** history.
 
 ---
 
@@ -72,11 +74,11 @@ If Rent (₦30,000) and Data (₦4,000) are ticked under Needs, you have sorted 
 
 | Screen | Purpose |
 | --- | --- |
-| **Home** | Time-of-day greeting, rotating Islamic quote, date selector (today or any past day), daily progress bar, and transactions |
+| **Home** | Taslim greeting, rotating Islamic reminders on wealth & charity, date selector (today or any past day), daily progress bar, and transactions |
 | **Budget & Income** | Total monthly income, live 50:30:20 / custom ratio split, `Edit budget`, and all logged income streams (`Salary`, `Gift / Dash`, `Side Gig`, `Other`) |
-| **Wants & Needs** | The monthly checklist for Needs, Wants, and Investment, with remaining budget and one-tap delete |
-| **Add / Edit sheet** | Amount first, date picker, number pad, category or income source chips, optional note |
-| **Insights** | Month total, category donut chart, budget progress, past months |
+| **Wants & Needs** | The monthly checklist for Needs, Wants, and Investment, with remaining budget, Wants-exhausted overflow warning, and one-tap delete |
+| **Add / Edit sheet** | Amount first, date picker, number pad, category (`Food`, `Transport`, `Data`, `Sadaqah`, `Other`) or income source chips, optional note |
+| **Insights** | Month total (tap to open full-screen monthly transactions list), category donut chart, budget progress, and past months history |
 
 Navigation has four tabs: **Home**, **Budget & Income**, **Wants & Needs**, and **Insights**.
 
@@ -176,12 +178,13 @@ All data stays locally on your device via Room and `SharedPreferences`. There ar
 
 - [x] Daily total and daily budget
 - [x] Select any past date to view or log forgotten daily expenses
-- [x] Time-of-day welcome greeting & 3-hour rotating Islamic quotes
+- [x] Taslim greeting (`Assalamu alaykum`) & 3-hour rotating Islamic reminders on wealth, provision, and charity
 - [x] Dedicated Budget & Income screen for multiple income streams (`Salary`, `Gift / Dash`, `Side Gig`, `Other`)
 - [x] Monthly 50:30:20 & custom ratio budget screen
-- [x] Wants & Needs checklist with notes and one-tap delete
+- [x] Wants & Needs checklist with notes, one-tap delete, and automatic Wants-to-Needs overflow warning
+- [x] Dedicated `Sadaqah` category deducted from Needs
 - [x] Budget "left" figures that update as items are ticked
-- [x] Merged Insights and History screen with category donut chart
+- [x] Merged Insights and History screen with category donut chart and full-screen monthly transactions list
 - [x] Light & Dark themes (forest and sage)
 - [x] Carry over unsorted items to the next month
 - [x] Copy last month's budget

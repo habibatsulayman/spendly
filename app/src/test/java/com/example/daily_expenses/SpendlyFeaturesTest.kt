@@ -86,27 +86,14 @@ class SpendlyFeaturesTest {
     // ─── 1. Time-of-Day Welcome Greeting Tests ──────────────────────────────
 
     @Test
-    fun `greetingForHour returns appropriate time-of-day greeting for Habeebah`() {
-        // Morning: 5 AM to 11 AM
-        assertEquals("Good morning, Habeebah", greetingForHour(5))
-        assertEquals("Good morning, Habeebah", greetingForHour(9))
-        assertEquals("Good morning, Habeebah", greetingForHour(11))
-
-        // Afternoon: 12 PM to 4 PM (16)
-        assertEquals("Good afternoon, Habeebah", greetingForHour(12))
-        assertEquals("Good afternoon, Habeebah", greetingForHour(15))
-        assertEquals("Good afternoon, Habeebah", greetingForHour(16))
-
-        // Evening: 5 PM (17) to 8 PM (20)
-        assertEquals("Good evening, Habeebah", greetingForHour(17))
-        assertEquals("Good evening, Habeebah", greetingForHour(19))
-        assertEquals("Good evening, Habeebah", greetingForHour(20))
-
-        // Night: 9 PM (21) to 4 AM
-        assertEquals("Good night, Habeebah", greetingForHour(21))
-        assertEquals("Good night, Habeebah", greetingForHour(23))
-        assertEquals("Good night, Habeebah", greetingForHour(0))
-        assertEquals("Good night, Habeebah", greetingForHour(4))
+    fun `greetingForHour returns taslim greeting with endearing words for Habeebah`() {
+        assertEquals("Assalamu alaykum, dear Habeebah", greetingForHour(6))
+        assertEquals("Assalamu alaykum, Habeebah", greetingForHour(9))
+        assertEquals("Assalamu alaykum, lovely", greetingForHour(13))
+        assertEquals("Assalamu alaykum, sweet Habeebah", greetingForHour(15))
+        assertEquals("Assalamu alaykum, Habibti", greetingForHour(19))
+        assertEquals("Assalamu alaykum, dearest", greetingForHour(23))
+        assertEquals("Assalamu alaykum, dearest", greetingForHour(2))
     }
 
     // ─── 2. Rotating Islamic Soul-Lifting Quotes Tests ──────────────────────
@@ -461,5 +448,46 @@ class SpendlyFeaturesTest {
         )
         val octAggregate = pastList.first { it.year == 2026 && it.monthInt == Calendar.OCTOBER }
         assertEquals(118_800.0, octAggregate.totalAmount, 0.001)
+    }
+
+    @Test
+    fun `pastMonths excludes future months and unsorted planned items`() = runBlocking {
+        val oct2026 = Calendar.getInstance().apply {
+            set(2026, Calendar.OCTOBER, 15, 12, 0, 0)
+        }.timeInMillis
+        val dec2026 = Calendar.getInstance().apply {
+            set(2026, Calendar.DECEMBER, 1, 12, 0, 0)
+        }.timeInMillis
+
+        repository.addExpense(
+            Expense(amount = 78_300.0, category = "Food", description = "October expenses", date = oct2026, bucket = "Expense", isSorted = true)
+        )
+        // Planned unsorted Needs/Wants and logged Income in December 2026
+        repository.addExpense(
+            Expense(amount = 130_000.0, category = "Salary", description = "December salary", date = dec2026, bucket = "Income", isSorted = true)
+        )
+        repository.addExpense(
+            Expense(amount = 42_000.0, category = "Rent", description = "Planned December need", date = dec2026, bucket = "Needs", isSorted = false)
+        )
+
+        val summaryViewModel = SummaryViewModel(repository)
+        val allExpenses = repository.getAllExpenses().first()
+
+        // While viewing November 2026, December 2026 must NOT appear in pastMonths
+        val pastFromNov = summaryViewModel.computePastMonths(
+            allExpenses = allExpenses,
+            selected = com.example.daily_expenses.ui.summary.AvailableMonth("November 2026", 2026, Calendar.NOVEMBER),
+            investmentProvider = { year, month, _ ->
+                if (year == 2026 && month == Calendar.OCTOBER) 40_500.0 else 0.0
+            }
+        )
+        assertEquals(1, pastFromNov.size)
+        assertEquals(Calendar.OCTOBER, pastFromNov.first().monthInt)
+        assertFalse(pastFromNov.any { it.monthInt == Calendar.DECEMBER })
+
+        // And when viewing December 2026 directly, unsorted planned items must not count as spent
+        val decItems = repository.getExpensesForMonth(2026, Calendar.DECEMBER).first()
+        val decSummary = summaryViewModel.buildSummary(decItems, investmentSortedAmount = 0.0)
+        assertEquals(0.0, decSummary.totalAmount, 0.001)
     }
 }
