@@ -5,13 +5,13 @@
 Spendly is a calm, personal space to track daily spending and plan each month without the clutter of traditional budgeting apps.
 
 <p align="center">
-  <img src="screenshots/home.png" alt="Home Screen" width="200" />
+  <img src="screenshots/home.png?v=2" alt="Home Screen" width="200" />
   &nbsp;&nbsp;
-  <img src="screenshots/budget_income.png" alt="Budget & Income Screen" width="200" />
+  <img src="screenshots/budget_income.png?v=2" alt="Budget & Income Screen" width="200" />
   &nbsp;&nbsp;
-  <img src="screenshots/wants_needs.png" alt="Wants & Needs Screen" width="200" />
+  <img src="screenshots/wants_needs.png?v=2" alt="Wants & Needs Screen" width="200" />
   &nbsp;&nbsp;
-  <img src="screenshots/insights.png" alt="Insights Screen" width="200" />
+  <img src="screenshots/insights.png?v=2" alt="Insights Screen" width="200" />
 </p>
 
 ---
@@ -54,13 +54,13 @@ By default, Spendly uses the **50:30:20** rule (**Needs : Investment : Wants**),
 - **30% Investment** (or custom %): savings and investing, set aside first
 - **20% Wants** (or custom %): things you would like but could live without
 
-You can log individual income streams (`Salary`, `Gift / Dash`, `Side Gig`, `Other`) on the **Budget & Income** screen as money comes in—or set a monthly budget directly—and Spendly automatically calculates each bucket. Example with a monthly income of ₦120,000 on the default 50:30:20 split:
+You can log individual income streams (`Salary`, `Gift / Dash`, `Side Gig`, `Other`) on the **Budget & Income** screen as money comes in—or set a monthly budget directly—and Spendly automatically calculates each bucket. Example with a monthly income of ₦55,000 (`₦50,000 Salary` + `₦5,000 Gift / Dash`) on the default 50:30:20 split:
 
 | Category | Share | Budget |
 | --- | --- | --- |
-| Needs | 50% | ₦60,000 |
-| Investment | 30% | ₦36,000 |
-| Wants | 20% | ₦24,000 |
+| Needs | 50% | ₦27,500 |
+| Investment | 30% | ₦16,500 |
+| Wants | 20% | ₦11,000 |
 
 **Left = budget minus the total of items you have ticked as sorted (plus daily expenses in that bucket).**
 
